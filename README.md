@@ -6,6 +6,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%2F%2010-0078D6?logo=windows&logoColor=white)](https://github.com/Behrad87/DevPurge)
 [![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/behrad87)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Behrad87)
+[![Reymit (Iran)](https://img.shields.io/badge/Support-Reymit%20(Iran)-00C853?logo=cashapp&logoColor=white)](https://reymit.ir/behrad87)
 
 Developers frequently run out of SSD space due to dozens of forgotten repositories hoarding tens of gigabytes in build caches. General disk cleaners (WinDirStat, TreeSize) scan whole drives slowly and cannot distinguish between precious source code and disposable build artifacts.
 
@@ -114,6 +115,7 @@ DevPurge is 100% free and open source. If this tool saved your SSD space or sped
 - ⭐ **Star this repository** on GitHub
 - ☕ **Support on Ko-fi:** [ko-fi.com/behrad87](https://ko-fi.com/behrad87)
 - 💖 **Sponsor on GitHub:** [github.com/sponsors/Behrad87](https://github.com/sponsors/Behrad87)
+- 🇮🇷 **Donate via Reymit (Iran / ری‌میت):** [reymit.ir/behrad87](https://reymit.ir/behrad87)
 
 ---
 

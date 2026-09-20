@@ -56,6 +56,7 @@ public class Program
         Console.WriteLine("Support this free open-source project:");
         Console.WriteLine("  GitHub Sponsors: https://github.com/sponsors/Behrad87");
         Console.WriteLine("  Ko-fi:           https://ko-fi.com/behrad87");
+        Console.WriteLine("  Reymit (Iran):   https://reymit.ir/behrad87");
         Console.ResetColor();
     }
 
@@ -184,8 +185,9 @@ public class Program
 
             Console.WriteLine();
             Console.WriteLine("Enjoying DevPurge? Consider starring or supporting:");
-            Console.WriteLine("  ⭐ https://github.com/Behrad87/DevPurge");
-            Console.WriteLine("  ☕ https://ko-fi.com/behrad87");
+            Console.WriteLine("  ⭐ GitHub:        https://github.com/Behrad87/DevPurge");
+            Console.WriteLine("  ☕ Ko-fi:         https://ko-fi.com/behrad87");
+            Console.WriteLine("  🇮🇷 Reymit (Iran): https://reymit.ir/behrad87");
         }
 
         return report.FailedCount == 0 ? 0 : 2;

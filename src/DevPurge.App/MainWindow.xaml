@@ -63,6 +63,13 @@
                     </StackPanel>
                 </ui:Button>
 
+                <ui:Button Command="{Binding OpenReymitCommand}" Margin="0,0,8,0" Appearance="Secondary" ToolTip="Support via Reymit (Iran)">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Money24" Margin="0,0,6,0" Foreground="#00E676" />
+                        <TextBlock Text="Reymit (Iran)" />
+                    </StackPanel>
+                </ui:Button>
+
                 <ui:Button Command="{Binding OpenSponsorsCommand}" Appearance="Primary">
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Heart24" Margin="0,0,6,0" Foreground="#FF5E7E" />

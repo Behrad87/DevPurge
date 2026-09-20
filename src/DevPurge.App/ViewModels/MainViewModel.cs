@@ -228,6 +228,9 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void OpenKofi() => OpenUrl("https://ko-fi.com/behrad87");
 
+    [RelayCommand]
+    private void OpenReymit() => OpenUrl("https://reymit.ir/behrad87");
+
     private void ApplyFilter()
     {
         DisplayedItems.Clear();
