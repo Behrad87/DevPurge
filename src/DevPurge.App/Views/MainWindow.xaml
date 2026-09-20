@@ -19,7 +19,7 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
-    <Grid>
+    <Grid Background="#0F172A">
         <Grid.RowDefinitions>
             <!-- Native TitleBar with Minimize, Maximize, Close controls -->
             <RowDefinition Height="Auto" />
@@ -81,7 +81,7 @@
                                     <ui:SymbolIcon Symbol="DrinkCoffee24" Foreground="#FFA500" />
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="🇮🇷 ری‌میت (پرداخت ریالی شتاب)" Command="{Binding OpenReymitCommand}">
+                            <MenuItem Header="🇮🇷 ری‌میت - پرداخت ریالی شتاب" Command="{Binding OpenReymitCommand}">
                                 <MenuItem.Icon>
                                     <ui:SymbolIcon Symbol="Money24" Foreground="#10B981" />
                                 </MenuItem.Icon>
@@ -164,10 +164,10 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Filter by Age -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
-                        <TextBlock Text="Min Age:" VerticalAlignment="Center" Margin="0,0,8,0"
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <TextBlock Text="Min Age:" VerticalAlignment="Center" Margin="0,0,6,0"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <ComboBox SelectedIndex="{Binding MinAgeFilterIndex}" Width="130">
+                        <ComboBox SelectedIndex="{Binding MinAgeFilterIndex}" Width="115">
                             <ComboBoxItem Content="All Folders" />
                             <ComboBoxItem Content="> 7 days old" />
                             <ComboBoxItem Content="> 14 days old" />
@@ -177,13 +177,13 @@
 
                     <!-- Live Real-Time Search Filter -->
                     <ui:TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                PlaceholderText="Filter by name/path..."
-                                Width="180" VerticalContentAlignment="Center" Margin="0,0,14,0"
+                                PlaceholderText="Filter results..."
+                                Width="140" VerticalContentAlignment="Center" Margin="0,0,8,0"
                                 ClearButtonEnabled="True" />
 
                     <!-- Recycle Bin Toggle -->
                     <CheckBox Grid.Column="2" IsChecked="{Binding SendToRecycleBin}"
-                              Content="Recycle Bin (Safe Undo)" VerticalAlignment="Center" Margin="0,0,14,0"
+                              Content="Recycle Bin (Safe Undo)" VerticalAlignment="Center" Margin="0,0,8,0"
                               ToolTip="Moves files to the Windows Recycle Bin instead of permanent deletion" />
 
                     <!-- Quick Selection Buttons -->
@@ -250,7 +250,7 @@
                     </DataGridTemplateColumn>
 
                     <!-- Folder Name & Path -->
-                    <DataGridTemplateColumn Header="Folder Path" Width="*">
+                    <DataGridTemplateColumn Header="Folder Path" Width="*" MinWidth="480">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
