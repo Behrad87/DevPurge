@@ -17,19 +17,23 @@ public partial class MainViewModel : ObservableObject
     private readonly List<FolderItemViewModel> _allItems = [];
 
     [ObservableProperty]
-    private string _targetPath = @"D:\repos";
+    private string _targetPath = @"C:\repos";
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ScanCommand))]
+    [NotifyCanExecuteChangedFor(nameof(PurgeCommand))]
     private bool _isScanning;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ScanCommand))]
+    [NotifyCanExecuteChangedFor(nameof(PurgeCommand))]
     private bool _isPurging;
 
     [ObservableProperty]
     private string _statusText = "Ready to scan. Select your developer repository path and click Scan.";
 
     [ObservableProperty]
-    private string _summaryText = "0 B selected";
+    private string _summaryText = "0 B selected (0 of 0 folders)";
 
     [ObservableProperty]
     private bool _sendToRecycleBin = true;
@@ -37,11 +41,27 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private int _minAgeFilterIndex = 0; // 0=All, 1=>7 days, 2=>14 days, 3=>30 days
 
+    [ObservableProperty]
+    private bool _hasResults = false;
+
+    public bool HasNoItemsAndNotScanning => !IsScanning && !HasResults;
+
     public ObservableCollection<FolderItemViewModel> DisplayedItems { get; } = [];
+
+    private bool CanScan => !IsScanning && !IsPurging;
+    private bool CanPurge => !IsScanning && !IsPurging && DisplayedItems.Any(i => i.IsSelected);
 
     public MainViewModel()
     {
-        if (!Directory.Exists(_targetPath))
+        if (Directory.Exists(@"C:\repos"))
+        {
+            _targetPath = @"C:\repos";
+        }
+        else if (Directory.Exists(@"D:\repos"))
+        {
+            _targetPath = @"D:\repos";
+        }
+        else
         {
             var userSource = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "source");
             _targetPath = Directory.Exists(userSource) ? userSource : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -53,18 +73,27 @@ public partial class MainViewModel : ObservableObject
         ApplyFilter();
     }
 
+    partial void OnIsScanningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasNoItemsAndNotScanning));
+    }
+
+    partial void OnHasResultsChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasNoItemsAndNotScanning));
+    }
+
     public void UpdateSummary()
     {
         var selected = DisplayedItems.Where(i => i.IsSelected).ToList();
         long totalBytes = selected.Sum(i => i.SizeBytes);
         SummaryText = $"{DiscoveredFolder.FormatByteSize(totalBytes)} selected ({selected.Count} of {DisplayedItems.Count} folders)";
+        PurgeCommand.NotifyCanExecuteChanged();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {
-        if (IsScanning || IsPurging) return;
-
         if (string.IsNullOrWhiteSpace(TargetPath) || !Directory.Exists(TargetPath))
         {
             MessageBox.Show($"Target directory does not exist:\n{TargetPath}", "Invalid Path", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -72,6 +101,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         IsScanning = true;
+        HasResults = false;
         StatusText = $"Scanning '{TargetPath}' for disposable build artifacts...";
         _allItems.Clear();
         DisplayedItems.Clear();
@@ -81,7 +111,7 @@ public partial class MainViewModel : ObservableObject
         {
             if (!p.IsCompleted && !string.IsNullOrEmpty(p.CurrentPath))
             {
-                StatusText = $"Found {p.DiscoveredCount} folders ({DiscoveredFolder.FormatByteSize(p.TotalBytesFound)}) - {System.IO.Path.GetFileName(p.CurrentPath)}";
+                StatusText = $"Discovered: {p.DiscoveredCount} folders ({DiscoveredFolder.FormatByteSize(p.TotalBytesFound)}) - {System.IO.Path.GetFileName(p.CurrentPath)}";
             }
         });
 
@@ -97,6 +127,7 @@ public partial class MainViewModel : ObservableObject
 
             ApplyFilter();
 
+            HasResults = results.Count > 0;
             long totalBytes = results.Sum(r => r.SizeBytes);
             StatusText = $"Scan complete. Discovered {results.Count} disposable folders ({DiscoveredFolder.FormatByteSize(totalBytes)} reclaimable).";
         }
@@ -112,11 +143,9 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanPurge))]
     private async Task PurgeAsync()
     {
-        if (IsScanning || IsPurging) return;
-
         var selected = DisplayedItems.Where(i => i.IsSelected).ToList();
         if (selected.Count == 0)
         {
@@ -128,7 +157,7 @@ public partial class MainViewModel : ObservableObject
         var targetType = SendToRecycleBin ? "send to Windows Recycle Bin" : "PERMANENTLY delete";
 
         var confirm = MessageBox.Show(
-            $"Are you sure you want to {targetType} {selected.Count} folder(s)?\n\nTotal space to reclaim: {DiscoveredFolder.FormatByteSize(totalBytes)}\n\nThis will remove dependencies/build artifacts (which can be recompiled or reinstalled).",
+            $"Are you sure you want to {targetType} {selected.Count} folder(s)?\n\nTotal space to reclaim: {DiscoveredFolder.FormatByteSize(totalBytes)}\n\nThis will remove dependencies and compiled binaries (which can be restored or rebuilt).",
             "Confirm Purge",
             MessageBoxButton.YesNo,
             SendToRecycleBin ? MessageBoxImage.Question : MessageBoxImage.Warning
@@ -162,12 +191,13 @@ public partial class MainViewModel : ObservableObject
                 }
             }
 
+            HasResults = DisplayedItems.Count > 0;
             UpdateSummary();
             StatusText = $"Purge complete! Reclaimed {report.FormattedReclaimedSize} across {report.SuccessfulCount} folders.";
 
             MessageBox.Show(
                 $"Successfully purged {report.SuccessfulCount} folder(s)!\n\nReclaimed: {report.FormattedReclaimedSize}\n\n" +
-                (report.FailedCount > 0 ? $"Note: {report.FailedCount} folders could not be deleted (may be locked by running processes)." : ""),
+                (report.FailedCount > 0 ? $"Note: {report.FailedCount} folders could not be deleted (may be locked by running processes or permissions)." : ""),
                 "Purge Complete",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information
@@ -210,7 +240,7 @@ public partial class MainViewModel : ObservableObject
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
             Title = "Select Development Directory to Scan",
-            InitialDirectory = Directory.Exists(TargetPath) ? TargetPath : @"D:\repos"
+            InitialDirectory = Directory.Exists(TargetPath) ? TargetPath : @"C:\repos"
         };
 
         if (dialog.ShowDialog() == true)

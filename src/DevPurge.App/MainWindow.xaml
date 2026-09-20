@@ -7,9 +7,13 @@
         xmlns:vm="clr-namespace:DevPurge.App.ViewModels"
         mc:Ignorable="d"
         Title="DevPurge - Developer Disk Reclaimer"
-        Height="680" Width="1050"
+        Height="680" Width="1080"
         MinHeight="550" MinWidth="850"
         WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
 
     <Window.DataContext>
         <vm:MainViewModel />
@@ -98,7 +102,7 @@
                     </Grid.ColumnDefinitions>
 
                     <ui:TextBox Grid.Column="0" Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}"
-                                PlaceholderText="Enter or browse developer workspace directory (e.g. D:\repos)..."
+                                PlaceholderText="Enter or browse developer workspace directory (e.g. C:\repos or D:\repos)..."
                                 VerticalContentAlignment="Center" Margin="0,0,8,0" />
 
                     <ui:Button Grid.Column="1" Command="{Binding BrowsePathCommand}"
@@ -110,7 +114,6 @@
                     </ui:Button>
 
                     <ui:Button Grid.Column="2" Command="{Binding ScanCommand}"
-                               IsEnabled="{Binding IsScanning, Converter={x:Null}}"
                                Appearance="Primary" Padding="16,6">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Search24" Margin="0,0,6,0" />
@@ -178,12 +181,16 @@
         <!-- MAIN DATA GRID -->
         <Grid Grid.Row="2">
             <!-- Progress Bar during active scan/purge -->
-            <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Top"
-                         Visibility="{Binding IsScanning, Converter={x:Null}}" Margin="0,0,0,4" />
+            <ProgressBar IsIndeterminate="True" Height="4" VerticalAlignment="Top"
+                         Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" Margin="0,0,0,4" />
 
             <DataGrid ItemsSource="{Binding DisplayedItems}" AutoGenerateColumns="False"
                       CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal" RowHeight="38"
+                      EnableRowVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.IsDeferredScrollingEnabled="False"
                       Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                       BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <DataGrid.Columns>
@@ -192,7 +199,7 @@
                                             Width="45" Header="" />
 
                     <!-- Category / Ecosystem Badge -->
-                    <DataGridTemplateColumn Header="Category" Width="140">
+                    <DataGridTemplateColumn Header="Category" Width="150">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Border Background="#1E293B" CornerRadius="4" Padding="8,3"
@@ -241,6 +248,16 @@
                     </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
+
+            <!-- Empty State Prompt -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Visibility="{Binding HasNoItemsAndNotScanning, Converter={StaticResource BoolToVis}}">
+                <ui:SymbolIcon Symbol="FolderSearch24" FontSize="48" Foreground="#475569" HorizontalAlignment="Center" Margin="0,0,0,12" />
+                <TextBlock Text="Ready to scan for disposable build artifacts"
+                           FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                <TextBlock Text="Click the 'Scan Workspace' button above to locate bin/obj, node_modules, and target caches."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
+            </StackPanel>
         </Grid>
 
         <!-- FOOTER STATUS BAR -->
