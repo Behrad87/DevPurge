@@ -9,7 +9,8 @@
         Title="DevPurge - Developer Disk Reclaimer"
         Height="680" Width="1080"
         MinHeight="550" MinWidth="850"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/icon.ico">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -27,7 +28,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="DevPurge - Developer Disk Reclaimer" />
+        <ui:TitleBar Grid.Row="0" Title="DevPurge - Developer Disk Reclaimer" Icon="pack://application:,,,/Assets/icon.png" />
 
         <Grid Grid.Row="1" Margin="16,4,16,16">
             <Grid.RowDefinitions>
@@ -51,14 +52,16 @@
             <!-- Title & Branding -->
             <StackPanel Grid.Column="0" Orientation="Vertical">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <ui:SymbolIcon Symbol="DeleteDismiss24" FontSize="28" Foreground="#FF4B83" Margin="0,0,10,0" />
-                    <TextBlock Text="DevPurge" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <Border CornerRadius="8" Margin="0,0,12,0" Width="36" Height="36" ClipToBounds="True">
+                        <Image Source="pack://application:,,,/Assets/icon.png" Width="36" Height="36" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <TextBlock Text="DevPurge" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                     <Border Background="#2B2D3A" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="v1.0 • Open Source" FontSize="11" Foreground="#9E9E9E" />
                     </Border>
                 </StackPanel>
                 <TextBlock Text="Ultra-fast developer disk reclaimer for node_modules, bin/obj, target, and build caches."
-                           FontSize="13" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="38,2,0,0" />
+                           FontSize="13" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="48,4,0,0" />
             </StackPanel>
 
             <!-- Social & Donation Dropdown -->

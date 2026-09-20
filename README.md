@@ -1,4 +1,4 @@
-# DevPurge 🚀
+# <img src="assets/icon.png" width="38" height="38" align="center" /> DevPurge 🚀
 > **Ultra-fast developer disk reclaimer for disposable build caches and dependency folders.**
 
 [![Release](https://img.shields.io/github/v/release/Behrad87/DevPurge?color=00C853&logo=github)](https://github.com/Behrad87/DevPurge/releases/latest)

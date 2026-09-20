@@ -5,7 +5,8 @@
         Title="Space Reclaimed!"
         Height="460" Width="520"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Icon="pack://application:,,,/Assets/icon.ico">
 
     <Grid Background="#0F172A">
         <Grid.RowDefinitions>
@@ -13,7 +14,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="DevPurge - Reclaim Complete" ShowMaximize="False" />
+        <ui:TitleBar Grid.Row="0" Title="DevPurge - Reclaim Complete" ShowMaximize="False" Icon="pack://application:,,,/Assets/icon.png" />
 
         <Grid Grid.Row="1" Margin="24,12,24,24">
             <Grid.RowDefinitions>
