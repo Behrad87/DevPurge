@@ -1,0 +1,96 @@
+<ui:FluentWindow x:Class="DevPurge.App.Views.PurgeSuccessDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Space Reclaimed!"
+        Height="460" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="DevPurge - Reclaim Complete" ShowMaximize="False" />
+
+        <Grid Grid.Row="1" Margin="24,12,24,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Success Badge & Reclaimed Counter -->
+            <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
+                <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="44" Foreground="#10B981" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                <TextBlock x:Name="ReclaimedSizeText" Text="93.72 GB Reclaimed!"
+                           FontSize="24" FontWeight="Bold" Foreground="#38BDF8" HorizontalAlignment="Center" />
+                <TextBlock x:Name="FoldersCountText" Text="Across 1,721 folders • Windows Recycle Bin"
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <!-- Value Anchor Card -->
+            <Border Grid.Row="1" Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
+                    CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:SymbolIcon Grid.Column="0" Symbol="HardDrive24" FontSize="28" Foreground="#F59E0B" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="EstimatedValueText" Text="Estimated NVMe SSD storage value: ~$14.00"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="You just postponed a drive upgrade and uncluttered your dev workspace."
+                                   FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Intelligent Pitch -->
+            <TextBlock Grid.Row="2" Text="DevPurge is 100% free and open-source forever (no ads, no paywalls). If this tool helped your daily workflow, consider buying the developer a coffee to keep maintenance alive!"
+                       TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       TextAlignment="Center" Margin="0,0,0,16" LineHeight="18" />
+
+            <!-- Support / Donation Options Buttons -->
+            <StackPanel Grid.Row="3" Orientation="Vertical" VerticalAlignment="Center">
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:Button Grid.Column="0" Click="OnKofiClicked" Appearance="Secondary" Margin="0,0,4,0" Padding="12,8">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="DrinkCoffee24" Margin="0,0,8,0" Foreground="#FFA500" />
+                            <TextBlock Text="Tip on Ko-fi ($3)" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </ui:Button>
+
+                    <ui:Button Grid.Column="1" Click="OnReymitClicked" Appearance="Secondary" Margin="4,0,0,0" Padding="12,8">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Money24" Margin="0,0,8,0" Foreground="#10B981" />
+                            <TextBlock Text="ری‌میت (شتاب)" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </ui:Button>
+                </Grid>
+
+                <ui:Button Click="OnSponsorClicked" Appearance="Primary" Padding="12,8" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Heart24" Margin="0,0,8,0" Foreground="#FF5E7E" />
+                        <TextBlock Text="Sponsor on GitHub (Wall of Fame)" FontWeight="Bold" />
+                    </StackPanel>
+                </ui:Button>
+            </StackPanel>
+
+            <!-- Close Action -->
+            <ui:Button Grid.Row="4" Click="OnCloseClicked" Appearance="Transparent"
+                       HorizontalAlignment="Center" Content="Close &amp; Continue Coding" Margin="0,8,0,0" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

@@ -195,13 +195,28 @@ public partial class MainViewModel : ObservableObject
             UpdateSummary();
             StatusText = $"Purge complete! Reclaimed {report.FormattedReclaimedSize} across {report.SuccessfulCount} folders.";
 
-            MessageBox.Show(
-                $"Successfully purged {report.SuccessfulCount} folder(s)!\n\nReclaimed: {report.FormattedReclaimedSize}\n\n" +
-                (report.FailedCount > 0 ? $"Note: {report.FailedCount} folders could not be deleted (may be locked by running processes or permissions)." : ""),
-                "Purge Complete",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            );
+            if (report.SuccessfulCount > 0)
+            {
+                var dialog = new Views.PurgeSuccessDialog(
+                    report.FormattedReclaimedSize,
+                    report.SuccessfulCount,
+                    report.ReclaimedBytes,
+                    SendToRecycleBin
+                )
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                dialog.ShowDialog();
+            }
+            else
+            {
+                MessageBox.Show(
+                    "No folders were removed. They may be locked by running IDEs or processes.",
+                    "Purge Incomplete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning
+                );
+            }
         }
         catch (Exception ex)
         {
