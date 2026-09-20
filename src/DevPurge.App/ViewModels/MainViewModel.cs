@@ -47,7 +47,22 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = string.Empty;
 
-    partial void OnSearchTextChanged(string value) => ApplyFilter();
+    private CancellationTokenSource? _searchCts;
+
+    partial void OnSearchTextChanged(string value)
+    {
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+
+        Task.Delay(120, token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled)
+            {
+                System.Windows.Application.Current?.Dispatcher.Invoke(ApplyFilter);
+            }
+        }, TaskScheduler.Default);
+    }
 
     public bool HasNoItemsAndNotScanning => !IsScanning && !HasResults;
 
@@ -277,7 +292,6 @@ public partial class MainViewModel : ObservableObject
 
     private void ApplyFilter()
     {
-        DisplayedItems.Clear();
         int minDays = MinAgeFilterIndex switch
         {
             1 => 7,
@@ -302,7 +316,16 @@ public partial class MainViewModel : ObservableObject
             );
         }
 
-        foreach (var item in query)
+        var list = query.ToList();
+
+        if (list.Count == DisplayedItems.Count && list.SequenceEqual(DisplayedItems))
+        {
+            UpdateSummary();
+            return;
+        }
+
+        DisplayedItems.Clear();
+        foreach (var item in list)
         {
             DisplayedItems.Add(item);
         }

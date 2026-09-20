@@ -8,7 +8,7 @@
         mc:Ignorable="d"
         Title="DevPurge - Developer Disk Reclaimer"
         Height="680" Width="1080"
-        MinHeight="550" MinWidth="850"
+        MinHeight="520" MinWidth="750"
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/Assets/icon.ico">
 
@@ -141,78 +141,84 @@
                     </ui:Button>
                 </Grid>
 
-                <!-- Row 2: Quick Path Preset Chips -->
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock Text="Quick paths:" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="C:\repos"
-                               Appearance="Transparent" Padding="8,2" Margin="0,0,6,0">
-                        <TextBlock Text="📁 C:\repos" FontSize="11" Foreground="#38BDF8" />
-                    </ui:Button>
-                    <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="D:\repos"
-                               Appearance="Transparent" Padding="8,2" Margin="0,0,6,0">
-                        <TextBlock Text="📁 D:\repos" FontSize="11" Foreground="#38BDF8" />
-                    </ui:Button>
-                </StackPanel>
-
-                <!-- Row 3: Filters, Search, Selection & Purge Action -->
-                <Grid Grid.Row="2">
+                <!-- Row 2: Quick Path Preset Chips & Recycle Bin Toggle -->
+                <Grid Grid.Row="1" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Filter by Age -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <TextBlock Text="Min Age:" VerticalAlignment="Center" Margin="0,0,6,0"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <ComboBox SelectedIndex="{Binding MinAgeFilterIndex}" Width="115">
-                            <ComboBoxItem Content="All Folders" />
-                            <ComboBoxItem Content="> 7 days old" />
-                            <ComboBoxItem Content="> 14 days old" />
-                            <ComboBoxItem Content="> 30 days old" />
-                        </ComboBox>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Quick paths:" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="C:\repos"
+                                   Appearance="Transparent" Padding="8,2" Margin="0,0,6,0">
+                            <TextBlock Text="📁 C:\repos" FontSize="11" Foreground="#38BDF8" />
+                        </ui:Button>
+                        <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="D:\repos"
+                                   Appearance="Transparent" Padding="8,2" Margin="0,0,6,0">
+                            <TextBlock Text="📁 D:\repos" FontSize="11" Foreground="#38BDF8" />
+                        </ui:Button>
                     </StackPanel>
 
-                    <!-- Live Real-Time Search Filter -->
-                    <ui:TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                PlaceholderText="Filter results..."
-                                Width="140" VerticalContentAlignment="Center" Margin="0,0,8,0"
-                                ClearButtonEnabled="True" />
-
-                    <!-- Recycle Bin Toggle -->
-                    <CheckBox Grid.Column="2" IsChecked="{Binding SendToRecycleBin}"
-                              Content="Recycle Bin (Safe Undo)" VerticalAlignment="Center" Margin="0,0,8,0"
+                    <!-- Recycle Bin Toggle (Anchored on right of Row 2) -->
+                    <CheckBox Grid.Column="1" IsChecked="{Binding SendToRecycleBin}"
+                              Content="Recycle Bin (Safe Undo)" VerticalAlignment="Center"
                               ToolTip="Moves files to the Windows Recycle Bin instead of permanent deletion" />
+                </Grid>
 
-                    <!-- Quick Selection Buttons -->
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:Button Command="{Binding SelectAllCommand}" Appearance="Transparent" Padding="6,4" Margin="0,0,4,0">
-                            <TextBlock Text="Select All" FontSize="12" />
-                        </ui:Button>
-                        <ui:Button Command="{Binding DeselectAllCommand}" Appearance="Transparent" Padding="6,4">
-                            <TextBlock Text="Deselect All" FontSize="12" />
+                <!-- Row 3: Responsive Filters & Action Toolbar -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Filter Controls (Uses WrapPanel to wrap gracefully if window is narrow) -->
+                    <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Filter by Age -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,10,2">
+                            <TextBlock Text="Min Age:" VerticalAlignment="Center" Margin="0,0,6,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <ComboBox SelectedIndex="{Binding MinAgeFilterIndex}" Width="120">
+                                <ComboBoxItem Content="All Folders" />
+                                <ComboBoxItem Content="> 7 days" />
+                                <ComboBoxItem Content="> 14 days" />
+                                <ComboBoxItem Content="> 30 days" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Live Real-Time Search Filter -->
+                        <ui:TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Filter results..."
+                                    Width="130" VerticalContentAlignment="Center" Margin="0,2,10,2"
+                                    ClearButtonEnabled="True" />
+
+                        <!-- Quick Selection Buttons -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,8,2">
+                            <ui:Button Command="{Binding SelectAllCommand}" Appearance="Transparent" Padding="6,4" Margin="0,0,4,0">
+                                <TextBlock Text="Select All" FontSize="11" />
+                            </ui:Button>
+                            <ui:Button Command="{Binding DeselectAllCommand}" Appearance="Transparent" Padding="6,4">
+                                <TextBlock Text="Deselect All" FontSize="11" />
+                            </ui:Button>
+                        </StackPanel>
+                    </WrapPanel>
+
+                    <!-- Right: Reclaimable Summary Badge & PURGE BUTTON (Always visible & pinned to the right) -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,2,0,2">
+                        <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
+                                CornerRadius="6" Padding="10,6" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SummaryText}" FontWeight="SemiBold" Foreground="#38BDF8" FontSize="12" />
+                        </Border>
+
+                        <ui:Button Command="{Binding PurgeCommand}"
+                                   Appearance="Danger" Padding="16,8">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Delete24" Margin="0,0,6,0" />
+                                <TextBlock Text="Purge Selected" FontWeight="Bold" />
+                            </StackPanel>
                         </ui:Button>
                     </StackPanel>
-
-                    <!-- Reclaimable Badge Summary -->
-                    <Border Grid.Column="5" Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
-                            CornerRadius="6" Padding="12,6" Margin="0,0,12,0" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding SummaryText}" FontWeight="SemiBold" Foreground="#38BDF8" />
-                    </Border>
-
-                    <!-- PURGE BUTTON -->
-                    <ui:Button Grid.Column="6" Command="{Binding PurgeCommand}"
-                               Appearance="Danger" Padding="18,8">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Symbol="Delete24" Margin="0,0,6,0" />
-                            <TextBlock Text="Purge Selected" FontWeight="Bold" />
-                        </StackPanel>
-                    </ui:Button>
                 </Grid>
             </Grid>
         </Border>
@@ -235,15 +241,15 @@
                 <DataGrid.Columns>
                     <!-- Checkbox Column -->
                     <DataGridCheckBoxColumn Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
-                                            Width="45" Header="" />
+                                            Width="38" Header="" />
 
                     <!-- Category / Ecosystem Badge (Color Coded) -->
-                    <DataGridTemplateColumn Header="Category" Width="160">
+                    <DataGridTemplateColumn Header="Category" Width="130">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Border Background="{Binding CategoryBadgeBackground}"
                                         BorderBrush="{Binding CategoryBadgeBorder}" BorderThickness="1"
-                                        CornerRadius="4" Padding="8,3"
+                                        CornerRadius="4" Padding="6,2"
                                         HorizontalAlignment="Left" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding CategoryName}" FontSize="11" FontWeight="Medium"
                                                Foreground="{Binding CategoryBadgeForeground}" />
@@ -253,7 +259,7 @@
                     </DataGridTemplateColumn>
 
                     <!-- Folder Name & Path -->
-                    <DataGridTemplateColumn Header="Folder Path" Width="*" MinWidth="480">
+                    <DataGridTemplateColumn Header="Folder Path" Width="*" MinWidth="180">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -265,20 +271,20 @@
                     </DataGridTemplateColumn>
 
                     <!-- Age / Last Modified -->
-                    <DataGridTextColumn Header="Last Modified" Binding="{Binding FormattedAge}" Width="120" />
+                    <DataGridTextColumn Header="Last Modified" Binding="{Binding FormattedAge}" Width="105" />
 
                     <!-- Size Column -->
-                    <DataGridTemplateColumn Header="Size" Width="110">
+                    <DataGridTemplateColumn Header="Size" Width="95">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding FormattedSize}" FontWeight="Bold" Foreground="#38BDF8"
-                                           HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
                     <!-- Actions (Open in Explorer) -->
-                    <DataGridTemplateColumn Header="" Width="60">
+                    <DataGridTemplateColumn Header="" Width="45">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <ui:Button Command="{Binding OpenInExplorerCommand}"
