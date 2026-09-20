@@ -181,15 +181,9 @@ public partial class MainViewModel : ObservableObject
                 progress: progress
             );
 
-            // Remove successfully deleted folders from lists
-            foreach (var item in selected)
-            {
-                if (!Directory.Exists(item.Path))
-                {
-                    _allItems.Remove(item);
-                    DisplayedItems.Remove(item);
-                }
-            }
+            // Fast in-memory removal without flooding WPF layout passes
+            _allItems.RemoveAll(item => !Directory.Exists(item.Path));
+            ApplyFilter();
 
             HasResults = DisplayedItems.Count > 0;
             UpdateSummary();

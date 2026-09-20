@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using DevPurge.Core.Models;
 using DevPurge.Core.Scanning;
@@ -5,7 +6,8 @@ using DevPurge.Core.Scanning;
 namespace DevPurge.Core.Purging;
 
 /// <summary>
-/// Handles safe deletion of target artifact directories.
+/// High-speed safe deletion service for target artifact directories.
+/// Supports high-throughput batch Recycle Bin operations and parallel permanent purging.
 /// </summary>
 public class PurgeService
 {
@@ -35,19 +37,26 @@ public class PurgeService
     [DllImport("shell32.dll", CharSet = CharSet.Auto)]
     private static extern int SHFileOperation(ref SHFILEOPSTRUCT FileOp);
 
-    private static bool SendToRecycleBin(string path)
+    /// <summary>
+    /// Deletes a batch of folders to the Windows Recycle Bin in a single native shell operation.
+    /// Dramatically faster than invoking the shell for each folder individually.
+    /// </summary>
+    private static bool SendToRecycleBinBatch(IEnumerable<string> paths)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             return false;
         }
 
-        // SHFileOperation expects double null-terminated string
-        var pathWithNull = path + "\0\0";
+        var validPaths = paths.Where(Directory.Exists).ToList();
+        if (validPaths.Count == 0) return true;
+
+        // SHFileOperation expects null-delimited paths ending with a double null: "path1\0path2\0path3\0\0"
+        var buffer = string.Join("\0", validPaths) + "\0\0";
         var fileOp = new SHFILEOPSTRUCT
         {
             wFunc = FO_DELETE,
-            pFrom = pathWithNull,
+            pFrom = buffer,
             fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI
         };
 
@@ -69,7 +78,7 @@ public class PurgeService
     }
 
     /// <summary>
-    /// Purges a collection of discovered folders.
+    /// Purges target folders using parallel deletion and batched shell operations for maximum throughput.
     /// </summary>
     public async Task<DeletionReport> PurgeAsync(
         IEnumerable<DiscoveredFolder> folders,
@@ -83,78 +92,132 @@ public class PurgeService
         int successful = 0;
         int failed = 0;
         long reclaimedBytes = 0;
-        var failures = new List<(string Path, string Error)>();
+        var failures = new ConcurrentBag<(string Path, string Error)>();
 
-        await Task.Run(() =>
+        // Pre-validate safety
+        var safeFolders = new List<DiscoveredFolder>();
+        foreach (var folder in list)
         {
-            foreach (var folder in list)
+            var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(folder.Path, _allowedFolderNames);
+            if (!isSafe)
             {
-                if (cancellationToken.IsCancellationRequested) break;
+                failures.Add((folder.Path, reason ?? "Safety validation failed."));
+                Interlocked.Increment(ref failed);
+                Interlocked.Increment(ref completed);
+            }
+            else
+            {
+                safeFolders.Add(folder);
+            }
+        }
 
+        if (sendToRecycleBin && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            // Batch Recycle Bin in chunks of 50 paths to avoid shell overhead
+            const int batchSize = 50;
+            var chunks = safeFolders.Chunk(batchSize).ToList();
+
+            await Task.Run(() =>
+            {
+                foreach (var chunk in chunks)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
+
+                    var paths = chunk.Select(c => c.Path).ToList();
+                    bool batchOk = SendToRecycleBinBatch(paths);
+
+                    if (batchOk)
+                    {
+                        foreach (var item in chunk)
+                        {
+                            Interlocked.Increment(ref successful);
+                            Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: permanent parallel delete for any items that failed Recycle Bin
+                        Parallel.ForEach(chunk, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, item =>
+                        {
+                            try
+                            {
+                                ForceDeleteDirectory(item.Path);
+                                Interlocked.Increment(ref successful);
+                                Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
+                            }
+                            catch (Exception ex)
+                            {
+                                failures.Add((item.Path, ex.Message));
+                                Interlocked.Increment(ref failed);
+                            }
+                        });
+                    }
+
+                    int currentCompleted = Interlocked.Add(ref completed, chunk.Length);
+                    progress?.Report((chunk.Last().Path, currentCompleted, total));
+                }
+            }, cancellationToken);
+        }
+        else
+        {
+            // High-speed parallel permanent deletion across all CPU cores
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Max(4, Environment.ProcessorCount * 2),
+                CancellationToken = cancellationToken
+            };
+
+            await Parallel.ForEachAsync(safeFolders, parallelOptions, (folder, ct) =>
+            {
                 try
                 {
-                    // 1. Safety validation re-check
-                    var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(folder.Path, _allowedFolderNames);
-                    if (!isSafe)
-                    {
-                        failures.Add((folder.Path, reason ?? "Safety validation failed."));
-                        failed++;
-                        continue;
-                    }
-
-                    if (!Directory.Exists(folder.Path))
-                    {
-                        // Folder already removed or no longer exists
-                        completed++;
-                        continue;
-                    }
-
-                    // 2. Perform deletion
-                    bool deleted = false;
-                    if (sendToRecycleBin)
-                    {
-                        deleted = SendToRecycleBin(folder.Path);
-                    }
-
-                    if (!deleted)
-                    {
-                        // Permanent deletion (or fallback if RecycleBin failed)
-                        ForceDeleteDirectory(folder.Path);
-                        deleted = true;
-                    }
-
-                    if (deleted)
-                    {
-                        successful++;
-                        reclaimedBytes += folder.SizeBytes;
-                    }
+                    ForceDeleteDirectory(folder.Path);
+                    Interlocked.Increment(ref successful);
+                    Interlocked.Add(ref reclaimedBytes, folder.SizeBytes);
                 }
                 catch (Exception ex)
                 {
                     failures.Add((folder.Path, ex.Message));
-                    failed++;
+                    Interlocked.Increment(ref failed);
                 }
                 finally
                 {
-                    completed++;
-                    progress?.Report((folder.Path, completed, total));
+                    int current = Interlocked.Increment(ref completed);
+                    // Throttle progress updates to avoid UI thread saturation
+                    if (current % 10 == 0 || current == total)
+                    {
+                        progress?.Report((folder.Path, current, total));
+                    }
                 }
-            }
-        }, cancellationToken);
 
-        return new DeletionReport(total, successful, failed, reclaimedBytes, failures);
+                return ValueTask.CompletedTask;
+            });
+        }
+
+        progress?.Report((string.Empty, total, total));
+        return new DeletionReport(total, successful, failed, reclaimedBytes, failures.ToList());
     }
 
     /// <summary>
-    /// Robust permanent directory deletion, clearing read-only attributes that cause UnauthorizedAccessException.
+    /// Robust, high-speed directory deletion.
+    /// Fast-path tries direct deletion; fallback catches permission issues and clears read-only flags.
     /// </summary>
     public static void ForceDeleteDirectory(string path)
     {
         if (!Directory.Exists(path)) return;
 
-        var di = new DirectoryInfo(path);
-        ClearReadOnlyAttributes(di);
-        di.Delete(recursive: true);
+        try
+        {
+            // Fast path: direct recursive deletion (instant for 99% of folders)
+            Directory.Delete(path, recursive: true);
+        }
+        catch (Exception)
+        {
+            // Fallback: strip read-only attributes and retry
+            var di = new DirectoryInfo(path);
+            ClearReadOnlyAttributes(di);
+            Directory.Delete(path, recursive: true);
+        }
     }
 
     private static void ClearReadOnlyAttributes(DirectoryInfo directory)
