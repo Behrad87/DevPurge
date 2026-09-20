@@ -1,0 +1,257 @@
+<ui:FluentWindow x:Class="DevPurge.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:vm="clr-namespace:DevPurge.App.ViewModels"
+        mc:Ignorable="d"
+        Title="DevPurge - Developer Disk Reclaimer"
+        Height="680" Width="1050"
+        MinHeight="550" MinWidth="850"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <!-- Header -->
+            <RowDefinition Height="Auto" />
+            <!-- Toolbar / Controls -->
+            <RowDefinition Height="Auto" />
+            <!-- Main Content (DataGrid / Empty state) -->
+            <RowDefinition Height="*" />
+            <!-- Footer Status Bar -->
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- HEADER -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Title & Branding -->
+            <StackPanel Grid.Column="0" Orientation="Vertical">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="DeleteDismiss24" FontSize="28" Foreground="#FF4B83" Margin="0,0,10,0" />
+                    <TextBlock Text="DevPurge" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <Border Background="#2B2D3A" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="v1.0 • Open Source" FontSize="11" Foreground="#9E9E9E" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="Ultra-fast developer disk reclaimer for node_modules, bin/obj, target, and build caches."
+                           FontSize="13" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="38,2,0,0" />
+            </StackPanel>
+
+            <!-- Social & Donation Links -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:Button Command="{Binding OpenGitHubCommand}" Margin="0,0,8,0" Appearance="Secondary">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Star24" Margin="0,0,6,0" Foreground="#FFD700" />
+                        <TextBlock Text="Star on GitHub" />
+                    </StackPanel>
+                </ui:Button>
+
+                <ui:Button Command="{Binding OpenKofiCommand}" Margin="0,0,8,0" Appearance="Secondary">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="DrinkCoffee24" Margin="0,0,6,0" Foreground="#FFA500" />
+                        <TextBlock Text="Ko-fi" />
+                    </StackPanel>
+                </ui:Button>
+
+                <ui:Button Command="{Binding OpenSponsorsCommand}" Appearance="Primary">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Heart24" Margin="0,0,6,0" Foreground="#FF5E7E" />
+                        <TextBlock Text="Sponsor" FontWeight="SemiBold" />
+                    </StackPanel>
+                </ui:Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- TOOLBAR / CONTROLS CARD -->
+        <Border Grid.Row="1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="16" Margin="0,0,0,16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Row 1: Target Path Selector & Scan Button -->
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:TextBox Grid.Column="0" Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="Enter or browse developer workspace directory (e.g. D:\repos)..."
+                                VerticalContentAlignment="Center" Margin="0,0,8,0" />
+
+                    <ui:Button Grid.Column="1" Command="{Binding BrowsePathCommand}"
+                               Appearance="Secondary" Margin="0,0,8,0" ToolTip="Browse for workspace folder">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="FolderOpen24" Margin="0,0,6,0" />
+                            <TextBlock Text="Browse..." />
+                        </StackPanel>
+                    </ui:Button>
+
+                    <ui:Button Grid.Column="2" Command="{Binding ScanCommand}"
+                               IsEnabled="{Binding IsScanning, Converter={x:Null}}"
+                               Appearance="Primary" Padding="16,6">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Search24" Margin="0,0,6,0" />
+                            <TextBlock Text="Scan Workspace" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </ui:Button>
+                </Grid>
+
+                <!-- Row 2: Filters, Selection & Purge Action -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Filter by Age -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Min Age:" VerticalAlignment="Center" Margin="0,0,8,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <ComboBox SelectedIndex="{Binding MinAgeFilterIndex}" Width="140">
+                            <ComboBoxItem Content="All Folders" />
+                            <ComboBoxItem Content="> 7 days old" />
+                            <ComboBoxItem Content="> 14 days old" />
+                            <ComboBoxItem Content="> 30 days old" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Recycle Bin Toggle -->
+                    <CheckBox Grid.Column="1" IsChecked="{Binding SendToRecycleBin}"
+                              Content="Recycle Bin (Safe Undo)" VerticalAlignment="Center" Margin="0,0,16,0"
+                              ToolTip="Moves files to the Windows Recycle Bin instead of permanent deletion" />
+
+                    <!-- Quick Selection Buttons -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:Button Command="{Binding SelectAllCommand}" Appearance="Transparent" Padding="6,4" Margin="0,0,4,0">
+                            <TextBlock Text="Select All" FontSize="12" />
+                        </ui:Button>
+                        <ui:Button Command="{Binding DeselectAllCommand}" Appearance="Transparent" Padding="6,4">
+                            <TextBlock Text="Deselect All" FontSize="12" />
+                        </ui:Button>
+                    </StackPanel>
+
+                    <!-- Reclaimable Badge Summary -->
+                    <Border Grid.Column="4" Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
+                            CornerRadius="6" Padding="12,6" Margin="0,0,12,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SummaryText}" FontWeight="SemiBold" Foreground="#38BDF8" />
+                    </Border>
+
+                    <!-- PURGE BUTTON -->
+                    <ui:Button Grid.Column="5" Command="{Binding PurgeCommand}"
+                               Appearance="Danger" Padding="18,8">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Delete24" Margin="0,0,6,0" />
+                            <TextBlock Text="Purge Selected" FontWeight="Bold" />
+                        </StackPanel>
+                    </ui:Button>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- MAIN DATA GRID -->
+        <Grid Grid.Row="2">
+            <!-- Progress Bar during active scan/purge -->
+            <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Top"
+                         Visibility="{Binding IsScanning, Converter={x:Null}}" Margin="0,0,0,4" />
+
+            <DataGrid ItemsSource="{Binding DisplayedItems}" AutoGenerateColumns="False"
+                      CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal" RowHeight="38"
+                      Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                      BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <DataGrid.Columns>
+                    <!-- Checkbox Column -->
+                    <DataGridCheckBoxColumn Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                            Width="45" Header="" />
+
+                    <!-- Category / Ecosystem Badge -->
+                    <DataGridTemplateColumn Header="Category" Width="140">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="#1E293B" CornerRadius="4" Padding="8,3"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding CategoryName}" FontSize="11" Foreground="#94A3B8" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Folder Name & Path -->
+                    <DataGridTemplateColumn Header="Folder Path" Width="*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding FolderName}" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding Path}" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Age / Last Modified -->
+                    <DataGridTextColumn Header="Last Modified" Binding="{Binding FormattedAge}" Width="120" />
+
+                    <!-- Size Column -->
+                    <DataGridTemplateColumn Header="Size" Width="110">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding FormattedSize}" FontWeight="Bold" Foreground="#38BDF8"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Actions (Open in Explorer) -->
+                    <DataGridTemplateColumn Header="" Width="60">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ui:Button Command="{Binding OpenInExplorerCommand}"
+                                           Appearance="Transparent" Padding="4" ToolTip="Open folder in File Explorer">
+                                    <ui:SymbolIcon Symbol="Folder24" FontSize="16" />
+                                </ui:Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+
+        <!-- FOOTER STATUS BAR -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="🛡️ 100% Offline • Zero Telemetry • Open Source Forever"
+                           FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,16,0" />
+                <TextBlock Text="by Behrad87" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>
