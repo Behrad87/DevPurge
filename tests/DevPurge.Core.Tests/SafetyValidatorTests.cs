@@ -31,6 +31,19 @@ public class SafetyValidatorTests
         Assert.Contains("protected system folder", reason, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("/bin")]
+    [InlineData("/sbin")]
+    [InlineData("/usr/bin")]
+    [InlineData("/etc/nginx")]
+    [InlineData("/var/log/node_modules")]
+    public void CannotDeleteLinuxSystemDirectories(string linuxPath)
+    {
+        var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(linuxPath, AllowedFolderNames);
+        Assert.False(isSafe);
+        Assert.Contains("Linux root system directory", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void CannotDeleteGitDirectory()
     {

@@ -52,8 +52,29 @@ public static class SafetyValidator
 
             // 2. Never delete user profile root directly
             var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (string.Equals(fullPath, userProfile, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(userProfile) && string.Equals(fullPath, userProfile, StringComparison.OrdinalIgnoreCase))
                 return (false, "Cannot delete user profile folder.");
+
+            // 2b. Unix / Linux system root protections
+            var rawNormalized = folderPath.Trim().Replace('\\', '/');
+            var normalized = fullPath.Replace('\\', '/');
+            bool isLinuxSystem = rawNormalized == "/bin" || rawNormalized == "/sbin" || rawNormalized == "/usr/bin" ||
+                rawNormalized.StartsWith("/etc", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/var", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/usr", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/sys", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/proc", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/dev", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/boot", StringComparison.OrdinalIgnoreCase) ||
+                normalized == "/bin" || normalized == "/sbin" || normalized == "/usr/bin" ||
+                normalized.StartsWith("/etc", StringComparison.OrdinalIgnoreCase) ||
+                normalized.StartsWith("/var", StringComparison.OrdinalIgnoreCase) ||
+                normalized.StartsWith("/usr", StringComparison.OrdinalIgnoreCase);
+
+            if (isLinuxSystem)
+            {
+                return (false, "Cannot delete Linux root system directory.");
+            }
 
             // 3. Check against system folder blacklist
             var segments = fullPath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);

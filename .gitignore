@@ -23,3 +23,5 @@ $RECYCLE.BIN/
 ## Logs and temporary files
 *.log
 *.tmp
+publish/
+release/
