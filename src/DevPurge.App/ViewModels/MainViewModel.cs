@@ -44,6 +44,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasResults = false;
 
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    partial void OnSearchTextChanged(string value) => ApplyFilter();
+
     public bool HasNoItemsAndNotScanning => !IsScanning && !HasResults;
 
     public ObservableCollection<FolderItemViewModel> DisplayedItems { get; } = [];
@@ -281,14 +286,34 @@ public partial class MainViewModel : ObservableObject
             _ => 0
         };
 
-        foreach (var item in _allItems)
+        var query = _allItems.AsEnumerable();
+
+        if (minDays > 0)
         {
-            if (minDays == 0 || item.AgeDays >= minDays)
-            {
-                DisplayedItems.Add(item);
-            }
+            query = query.Where(item => item.AgeDays >= minDays);
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            query = query.Where(item =>
+                item.FolderName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                item.Path.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                item.CategoryName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+            );
+        }
+
+        foreach (var item in query)
+        {
+            DisplayedItems.Add(item);
         }
         UpdateSummary();
+    }
+
+    [RelayCommand]
+    private async Task SelectQuickPathAsync(string path)
+    {
+        TargetPath = path;
+        await ScanAsync();
     }
 
     private static void OpenUrl(string url)

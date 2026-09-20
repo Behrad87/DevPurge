@@ -29,6 +29,39 @@ public partial class FolderItemViewModel : ObservableObject
     public double AgeDays => _model.AgeDays;
     public int FileCount => _model.FileCount;
 
+    public string CategoryBadgeBackground => _model.ArtifactType switch
+    {
+        ArtifactType.DotNetBuild => "#2E1A47",
+        ArtifactType.NodeModules => "#064E3B",
+        ArtifactType.RustTarget => "#7C2D12",
+        ArtifactType.PythonVenv => "#1E3A8A",
+        ArtifactType.GradleBuild => "#831843",
+        ArtifactType.Vendor => "#134E4A",
+        _ => "#1E293B"
+    };
+
+    public string CategoryBadgeBorder => _model.ArtifactType switch
+    {
+        ArtifactType.DotNetBuild => "#7C3AED",
+        ArtifactType.NodeModules => "#10B981",
+        ArtifactType.RustTarget => "#F97316",
+        ArtifactType.PythonVenv => "#3B82F6",
+        ArtifactType.GradleBuild => "#EC4899",
+        ArtifactType.Vendor => "#14B8A6",
+        _ => "#334155"
+    };
+
+    public string CategoryBadgeForeground => _model.ArtifactType switch
+    {
+        ArtifactType.DotNetBuild => "#DDD6FE",
+        ArtifactType.NodeModules => "#A7F3D0",
+        ArtifactType.RustTarget => "#FFEDD5",
+        ArtifactType.PythonVenv => "#BFDBFE",
+        ArtifactType.GradleBuild => "#FCE7F3",
+        ArtifactType.Vendor => "#99F6E4",
+        _ => "#94A3B8"
+    };
+
     [ObservableProperty]
     private bool _isSelected;
 

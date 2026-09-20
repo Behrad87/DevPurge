@@ -61,34 +61,39 @@
                            FontSize="13" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="38,2,0,0" />
             </StackPanel>
 
-            <!-- Social & Donation Links -->
+            <!-- Social & Donation Dropdown -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <ui:Button Command="{Binding OpenGitHubCommand}" Margin="0,0,8,0" Appearance="Secondary">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Star24" Margin="0,0,6,0" Foreground="#FFD700" />
-                        <TextBlock Text="Star on GitHub" />
+                <ui:Button x:Name="SupportButton" Appearance="Primary" Padding="14,7" Click="OnSupportButtonClicked">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Heart24" Foreground="#FF5E7E" Margin="0,0,8,0" />
+                        <TextBlock Text="Support DevPurge" FontWeight="SemiBold" />
+                        <ui:SymbolIcon Symbol="ChevronDown24" FontSize="11" Margin="8,2,0,0" VerticalAlignment="Center" Foreground="#E2E8F0" />
                     </StackPanel>
-                </ui:Button>
-
-                <ui:Button Command="{Binding OpenKofiCommand}" Margin="0,0,8,0" Appearance="Secondary">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="DrinkCoffee24" Margin="0,0,6,0" Foreground="#FFA500" />
-                        <TextBlock Text="Ko-fi" />
-                    </StackPanel>
-                </ui:Button>
-
-                <ui:Button Command="{Binding OpenReymitCommand}" Margin="0,0,8,0" Appearance="Secondary" ToolTip="Support via Reymit (Iran)">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Money24" Margin="0,0,6,0" Foreground="#00E676" />
-                        <TextBlock Text="Reymit (Iran)" />
-                    </StackPanel>
-                </ui:Button>
-
-                <ui:Button Command="{Binding OpenSponsorsCommand}" Appearance="Primary">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Heart24" Margin="0,0,6,0" Foreground="#FF5E7E" />
-                        <TextBlock Text="Sponsor" FontWeight="SemiBold" />
-                    </StackPanel>
+                    <ui:Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="💖 Sponsor on GitHub (Wall of Fame)" Command="{Binding OpenSponsorsCommand}">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="Heart24" Foreground="#FF5E7E" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="☕ Ko-fi (Buy Me a Coffee - $3)" Command="{Binding OpenKofiCommand}">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="DrinkCoffee24" Foreground="#FFA500" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="🇮🇷 ری‌میت (پرداخت ریالی شتاب)" Command="{Binding OpenReymitCommand}">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="Money24" Foreground="#10B981" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="⭐ Star on GitHub" Command="{Binding OpenGitHubCommand}">
+                                <MenuItem.Icon>
+                                    <ui:SymbolIcon Symbol="Star24" Foreground="#FFD700" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </ui:Button.ContextMenu>
                 </ui:Button>
             </StackPanel>
         </Grid>
@@ -101,10 +106,11 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- Row 1: Target Path Selector & Scan Button -->
-                <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid Grid.Row="0" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -132,9 +138,23 @@
                     </ui:Button>
                 </Grid>
 
-                <!-- Row 2: Filters, Selection & Purge Action -->
-                <Grid Grid.Row="1">
+                <!-- Row 2: Quick Path Preset Chips -->
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+                    <TextBlock Text="Quick paths:" FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="C:\repos"
+                               Appearance="Transparent" Padding="8,2" Margin="0,0,6,0">
+                        <TextBlock Text="📁 C:\repos" FontSize="11" Foreground="#38BDF8" />
+                    </ui:Button>
+                    <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="D:\repos"
+                               Appearance="Transparent" Padding="8,2" Margin="0,0,6,0">
+                        <TextBlock Text="📁 D:\repos" FontSize="11" Foreground="#38BDF8" />
+                    </ui:Button>
+                </StackPanel>
+
+                <!-- Row 3: Filters, Search, Selection & Purge Action -->
+                <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -144,10 +164,10 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Filter by Age -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
                         <TextBlock Text="Min Age:" VerticalAlignment="Center" Margin="0,0,8,0"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <ComboBox SelectedIndex="{Binding MinAgeFilterIndex}" Width="140">
+                        <ComboBox SelectedIndex="{Binding MinAgeFilterIndex}" Width="130">
                             <ComboBoxItem Content="All Folders" />
                             <ComboBoxItem Content="> 7 days old" />
                             <ComboBoxItem Content="> 14 days old" />
@@ -155,13 +175,19 @@
                         </ComboBox>
                     </StackPanel>
 
+                    <!-- Live Real-Time Search Filter -->
+                    <ui:TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="Filter by name/path..."
+                                Width="180" VerticalContentAlignment="Center" Margin="0,0,14,0"
+                                ClearButtonEnabled="True" />
+
                     <!-- Recycle Bin Toggle -->
-                    <CheckBox Grid.Column="1" IsChecked="{Binding SendToRecycleBin}"
-                              Content="Recycle Bin (Safe Undo)" VerticalAlignment="Center" Margin="0,0,16,0"
+                    <CheckBox Grid.Column="2" IsChecked="{Binding SendToRecycleBin}"
+                              Content="Recycle Bin (Safe Undo)" VerticalAlignment="Center" Margin="0,0,14,0"
                               ToolTip="Moves files to the Windows Recycle Bin instead of permanent deletion" />
 
                     <!-- Quick Selection Buttons -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                         <ui:Button Command="{Binding SelectAllCommand}" Appearance="Transparent" Padding="6,4" Margin="0,0,4,0">
                             <TextBlock Text="Select All" FontSize="12" />
                         </ui:Button>
@@ -171,13 +197,13 @@
                     </StackPanel>
 
                     <!-- Reclaimable Badge Summary -->
-                    <Border Grid.Column="4" Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
+                    <Border Grid.Column="5" Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
                             CornerRadius="6" Padding="12,6" Margin="0,0,12,0" VerticalAlignment="Center">
                         <TextBlock Text="{Binding SummaryText}" FontWeight="SemiBold" Foreground="#38BDF8" />
                     </Border>
 
                     <!-- PURGE BUTTON -->
-                    <ui:Button Grid.Column="5" Command="{Binding PurgeCommand}"
+                    <ui:Button Grid.Column="6" Command="{Binding PurgeCommand}"
                                Appearance="Danger" Padding="18,8">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Delete24" Margin="0,0,6,0" />
@@ -208,13 +234,16 @@
                     <DataGridCheckBoxColumn Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
                                             Width="45" Header="" />
 
-                    <!-- Category / Ecosystem Badge -->
-                    <DataGridTemplateColumn Header="Category" Width="150">
+                    <!-- Category / Ecosystem Badge (Color Coded) -->
+                    <DataGridTemplateColumn Header="Category" Width="160">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Border Background="#1E293B" CornerRadius="4" Padding="8,3"
+                                <Border Background="{Binding CategoryBadgeBackground}"
+                                        BorderBrush="{Binding CategoryBadgeBorder}" BorderThickness="1"
+                                        CornerRadius="4" Padding="8,3"
                                         HorizontalAlignment="Left" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding CategoryName}" FontSize="11" Foreground="#94A3B8" />
+                                    <TextBlock Text="{Binding CategoryName}" FontSize="11" FontWeight="Medium"
+                                               Foreground="{Binding CategoryBadgeForeground}" />
                                 </Border>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
