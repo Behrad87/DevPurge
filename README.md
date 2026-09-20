@@ -1,9 +1,10 @@
 # DevPurge 🚀
 > **Ultra-fast developer disk reclaimer for disposable build caches and dependency folders.**
 
+[![Release](https://img.shields.io/github/v/release/Behrad87/DevPurge?color=00C853&logo=github)](https://github.com/Behrad87/DevPurge/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0%20%7C%208.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2011%20%2F%2010-0078D6?logo=windows&logoColor=white)](https://github.com/Behrad87/DevPurge)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-0078D6?logo=linux&logoColor=white)](https://github.com/Behrad87/DevPurge/releases/latest)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Behrad87)
 [![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/behrad87)
 [![Reymit (Iran)](https://img.shields.io/badge/Support-Reymit%20(Iran)-00C853?logo=cashapp&logoColor=white)](https://reymit.ir/behrad87)
@@ -44,6 +45,19 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 | **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache` |
 | **PHP / Go** | `vendor` |
 | **Visual Studio** | `.vs` |
+
+## 📦 Downloads (v1.0.0)
+
+Pre-built, **100% self-contained** standalone packages (zero runtime dependencies required):
+
+| Platform | Interface | Package |
+| :--- | :--- | :--- |
+| **Windows (x64)** | Modern Fluent GUI | [⬇️ DevPurge-v1.0.0-windows-x64-gui.zip](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-windows-x64-gui.zip) |
+| **Windows (x64)** | Headless CLI | [⬇️ DevPurge-v1.0.0-windows-x64-cli.zip](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-windows-x64-cli.zip) |
+| **Linux (x64)** | Headless CLI | [⬇️ DevPurge-v1.0.0-linux-x64-cli.tar.gz](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-linux-x64-cli.tar.gz) |
+| **Linux (ARM64)** | Headless CLI | [⬇️ DevPurge-v1.0.0-linux-arm64-cli.tar.gz](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-linux-arm64-cli.tar.gz) |
+
+👉 *Full release details and SHA-256 checksums available on the [Releases Page](https://github.com/Behrad87/DevPurge/releases/tag/v1.0.0).*
 
 ---
 
