@@ -19,17 +19,27 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
-    <Grid Margin="16">
+    <Grid>
         <Grid.RowDefinitions>
-            <!-- Header -->
+            <!-- Native TitleBar with Minimize, Maximize, Close controls -->
             <RowDefinition Height="Auto" />
-            <!-- Toolbar / Controls -->
-            <RowDefinition Height="Auto" />
-            <!-- Main Content (DataGrid / Empty state) -->
+            <!-- App Content Area -->
             <RowDefinition Height="*" />
-            <!-- Footer Status Bar -->
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="DevPurge - Developer Disk Reclaimer" />
+
+        <Grid Grid.Row="1" Margin="16,4,16,16">
+            <Grid.RowDefinitions>
+                <!-- Header -->
+                <RowDefinition Height="Auto" />
+                <!-- Toolbar / Controls -->
+                <RowDefinition Height="Auto" />
+                <!-- Main Content (DataGrid / Empty state) -->
+                <RowDefinition Height="*" />
+                <!-- Footer Status Bar -->
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
         <!-- HEADER -->
         <Grid Grid.Row="0" Margin="0,0,0,16">
@@ -277,5 +287,6 @@
                 <TextBlock Text="by Behrad87" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" />
             </StackPanel>
         </Grid>
+    </Grid>
     </Grid>
 </ui:FluentWindow>
