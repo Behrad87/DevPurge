@@ -47,10 +47,6 @@ public partial class App : Application
         var vm = new MainViewModel
         {
             TargetPath = @"C:\repos",
-            StatusText = "Scan complete. Discovered 1,721 disposable folders (93.72 GB reclaimable).",
-            SummaryText = "93.72 GB selected (1,721 of 1,721 folders)",
-            HasResults = true,
-            IsScanning = false
         };
 
         var samples = new List<DiscoveredFolder>
@@ -66,20 +62,28 @@ public partial class App : Application
             new() { FolderName = "vendor", Path = @"C:\repos\PowershellScripts\tools\vendor", ArtifactType = ArtifactType.Vendor, CategoryName = "Composer / Go", SizeBytes = 180000000L, FileCount = 620, LastModifiedUtc = DateTime.UtcNow.AddDays(-19) }
         };
 
-        foreach (var s in samples)
-        {
-            vm.DisplayedItems.Add(new FolderItemViewModel(s, vm.UpdateSummary));
-        }
+        vm.LoadSampleResults(samples);
+
+        // Customize display metrics for portfolio presentation
+        vm.FormattedTotalDiscoveredSize = "93.72 GB";
+        vm.DiscoveredCount = 1721;
+        vm.FormattedSelectedSize = "93.72 GB";
+        vm.SelectedCount = 1721;
+        vm.FormattedStaleSize = "68.40 GB";
+        vm.StaleCount = 1240;
+        vm.StatusText = "Scan complete. Discovered 1,721 disposable folders (93.72 GB reclaimable).";
+        vm.SummaryText = "93.72 GB selected (1,721 of 1,721 folders)";
+        vm.HasSelectedItems = true;
 
         var mainWindow = new MainWindow { DataContext = vm };
         if (mainWindow.Content is FrameworkElement mainElement)
         {
-            mainElement.Width = 1080;
-            mainElement.Height = 680;
-            mainElement.Measure(new Size(1080, 680));
-            mainElement.Arrange(new Rect(0, 0, 1080, 680));
+            mainElement.Width = 1180;
+            mainElement.Height = 780;
+            mainElement.Measure(new Size(1180, 780));
+            mainElement.Arrange(new Rect(0, 0, 1180, 780));
             mainElement.UpdateLayout();
-            SaveVisualToPng(mainElement, 1080, 680, Path.Combine(assetsDir, "screenshot.png"));
+            SaveVisualToPng(mainElement, 1180, 780, Path.Combine(assetsDir, "screenshot.png"));
         }
 
         // 2. Capture PurgeSuccessDialog content visual
@@ -87,11 +91,11 @@ public partial class App : Application
         if (dialog.Content is FrameworkElement dialogElement)
         {
             dialogElement.Width = 520;
-            dialogElement.Height = 460;
-            dialogElement.Measure(new Size(520, 460));
-            dialogElement.Arrange(new Rect(0, 0, 520, 460));
+            dialogElement.Height = 490;
+            dialogElement.Measure(new Size(520, 490));
+            dialogElement.Arrange(new Rect(0, 0, 520, 490));
             dialogElement.UpdateLayout();
-            SaveVisualToPng(dialogElement, 520, 460, Path.Combine(assetsDir, "milestone_celebration.png"));
+            SaveVisualToPng(dialogElement, 520, 490, Path.Combine(assetsDir, "milestone_celebration.png"));
         }
     }
 

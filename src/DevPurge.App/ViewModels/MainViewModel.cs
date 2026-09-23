@@ -242,6 +242,20 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public void LoadSampleResults(IEnumerable<DiscoveredFolder> samples)
+    {
+        _allItems.Clear();
+        DisplayedItems.Clear();
+        foreach (var s in samples)
+        {
+            _allItems.Add(new FolderItemViewModel(s, UpdateSummary));
+        }
+        RebuildCategoryFilters();
+        ApplyFilter();
+        HasResults = true;
+        UpdateSummary();
+    }
+
     [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {
