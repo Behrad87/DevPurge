@@ -10,6 +10,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <Product>DevPurge CLI</Product>
+    <Company>Behrad87</Company>
+    <Description>Headless cross-platform CLI for ultra-fast developer disk space reclamation</Description>
   </PropertyGroup>
 
 </Project>

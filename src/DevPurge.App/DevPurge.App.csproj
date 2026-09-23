@@ -17,6 +17,12 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <Product>DevPurge</Product>
+    <Company>Behrad87</Company>
+    <Description>Ultra-fast developer disk reclaimer for node_modules, bin/obj, target, and build caches</Description>
   </PropertyGroup>
 
   <ItemGroup>

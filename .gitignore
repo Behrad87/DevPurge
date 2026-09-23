@@ -24,4 +24,9 @@ $RECYCLE.BIN/
 *.log
 *.tmp
 publish/
-release/
+release/*.zip
+release/*.tar.gz
+release/*.exe
+release/win-x64/
+release/linux-x64/
+release/linux-arm64/

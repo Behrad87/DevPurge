@@ -47,18 +47,19 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 | **PHP / Go** | `vendor` |
 | **Visual Studio** | `.vs` |
 
-## 📦 Downloads (v1.0.0)
+## 📦 Downloads (v1.1.0)
 
 Pre-built, **100% self-contained** standalone packages (zero runtime dependencies required):
 
 | Platform | Interface | Package |
 | :--- | :--- | :--- |
-| **Windows (x64)** | Modern Fluent GUI | [⬇️ DevPurge-v1.0.0-windows-x64-gui.zip](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-windows-x64-gui.zip) |
-| **Windows (x64)** | Headless CLI | [⬇️ DevPurge-v1.0.0-windows-x64-cli.zip](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-windows-x64-cli.zip) |
-| **Linux (x64)** | Headless CLI | [⬇️ DevPurge-v1.0.0-linux-x64-cli.tar.gz](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-linux-x64-cli.tar.gz) |
-| **Linux (ARM64)** | Headless CLI | [⬇️ DevPurge-v1.0.0-linux-arm64-cli.tar.gz](https://github.com/Behrad87/DevPurge/releases/download/v1.0.0/DevPurge-v1.0.0-linux-arm64-cli.tar.gz) |
+| **Windows (x64)** | **Setup Installer (Recommended)** | [⬇️ DevPurge-v1.1.0-windows-x64-installer.exe](https://github.com/Behrad87/DevPurge/releases/download/v1.1.0/DevPurge-v1.1.0-windows-x64-installer.exe) |
+| **Windows (x64)** | Modern Fluent GUI (Portable) | [⬇️ DevPurge-v1.1.0-windows-x64-gui.zip](https://github.com/Behrad87/DevPurge/releases/download/v1.1.0/DevPurge-v1.1.0-windows-x64-gui.zip) |
+| **Windows (x64)** | Headless CLI | [⬇️ DevPurge-v1.1.0-windows-x64-cli.zip](https://github.com/Behrad87/DevPurge/releases/download/v1.1.0/DevPurge-v1.1.0-windows-x64-cli.zip) |
+| **Linux (x64)** | Headless CLI | [⬇️ DevPurge-v1.1.0-linux-x64-cli.tar.gz](https://github.com/Behrad87/DevPurge/releases/download/v1.1.0/DevPurge-v1.1.0-linux-x64-cli.tar.gz) |
+| **Linux (ARM64)** | Headless CLI | [⬇️ DevPurge-v1.1.0-linux-arm64-cli.tar.gz](https://github.com/Behrad87/DevPurge/releases/download/v1.1.0/DevPurge-v1.1.0-linux-arm64-cli.tar.gz) |
 
-👉 *Full release details and SHA-256 checksums available on the [Releases Page](https://github.com/Behrad87/DevPurge/releases/tag/v1.0.0).*
+👉 *Full release details and SHA-256 checksums available on the [Releases Page](https://github.com/Behrad87/DevPurge/releases/tag/v1.1.0).*
 
 ---
 

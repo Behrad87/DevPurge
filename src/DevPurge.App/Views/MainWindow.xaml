@@ -230,7 +230,7 @@
                             </Border>
                             <TextBlock Text="DevPurge" FontSize="20" FontWeight="Bold" Foreground="#F8FAFC" VerticalAlignment="Center" />
                             <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="v1.0 • Developer Edition" FontSize="10" FontWeight="SemiBold" Foreground="#38BDF8" />
+                                <TextBlock Text="v1.1 • Developer Edition" FontSize="10" FontWeight="SemiBold" Foreground="#38BDF8" />
                             </Border>
                             <TextBlock Text="— Fast developer disk reclaimer for node_modules, bin/obj, target, &amp; virtualenvs"
                                        FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center" Margin="12,0,0,0" />
