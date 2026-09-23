@@ -1,5 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/DevPurge.App/DevPurge.App.csproj" />
+    <Project Path="src/DevPurge.Cli/DevPurge.Cli.csproj" />
+    <Project Path="src/DevPurge.Core/DevPurge.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DevPurge.Core.Tests/DevPurge.Core.Tests.csproj" />
   </Folder>
 </Solution>

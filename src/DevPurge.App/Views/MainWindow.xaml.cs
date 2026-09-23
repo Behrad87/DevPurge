@@ -18,6 +18,7 @@ public partial class MainWindow : FluentWindow
     {
         if (sender is FrameworkElement fe && fe.ContextMenu != null)
         {
+            fe.ContextMenu.DataContext = fe.DataContext ?? DataContext;
             fe.ContextMenu.PlacementTarget = fe;
             fe.ContextMenu.Placement = PlacementMode.Bottom;
             fe.ContextMenu.IsOpen = true;
