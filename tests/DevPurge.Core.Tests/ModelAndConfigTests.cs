@@ -26,4 +26,30 @@ public class ModelAndConfigTests
         Assert.Contains(rules, r => r.FolderNames.Contains(".gradle"));
         Assert.Contains(rules, r => r.FolderNames.Contains(".venv"));
     }
+
+    [Fact]
+    public void DiscoveredFolder_FormattedAge_FormatsCorrectly()
+    {
+        var todayFolder = new DiscoveredFolder
+        {
+            Path = @"C:\repos\test\bin",
+            FolderName = "bin",
+            ArtifactType = ArtifactType.DotNetBuild,
+            CategoryName = ".NET / C#",
+            LastModifiedUtc = DateTime.UtcNow,
+            SizeBytes = 1024
+        };
+        Assert.Equal("Today", todayFolder.FormattedAge);
+
+        var monthOldFolder = new DiscoveredFolder
+        {
+            Path = @"C:\repos\test\node_modules",
+            FolderName = "node_modules",
+            ArtifactType = ArtifactType.NodeModules,
+            CategoryName = "JavaScript / Node.js",
+            LastModifiedUtc = DateTime.UtcNow.AddDays(-35),
+            SizeBytes = 1024 * 1024
+        };
+        Assert.Equal("1 month ago", monthOldFolder.FormattedAge);
+    }
 }

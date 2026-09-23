@@ -15,12 +15,15 @@ public partial class MainViewModel : ObservableObject
     private readonly FastDirectoryScanner _scanner = new();
     private readonly PurgeService _purgeService = new();
     private readonly List<FolderItemViewModel> _allItems = [];
+    private CancellationTokenSource? _scanCts;
+    private CancellationTokenSource? _searchCts;
 
     [ObservableProperty]
     private string _targetPath = @"C:\repos";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ScanCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelScanCommand))]
     [NotifyCanExecuteChangedFor(nameof(PurgeCommand))]
     private bool _isScanning;
 
@@ -47,29 +50,54 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = string.Empty;
 
-    private CancellationTokenSource? _searchCts;
+    // --- KPI Analytics Metrics ---
+    [ObservableProperty]
+    private long _totalDiscoveredBytes;
 
-    partial void OnSearchTextChanged(string value)
-    {
-        _searchCts?.Cancel();
-        _searchCts = new CancellationTokenSource();
-        var token = _searchCts.Token;
+    [ObservableProperty]
+    private string _formattedTotalDiscoveredSize = "0 B";
 
-        Task.Delay(120, token).ContinueWith(t =>
-        {
-            if (!t.IsCanceled)
-            {
-                System.Windows.Application.Current?.Dispatcher.Invoke(ApplyFilter);
-            }
-        }, TaskScheduler.Default);
-    }
+    [ObservableProperty]
+    private int _discoveredCount;
+
+    [ObservableProperty]
+    private long _selectedBytes;
+
+    [ObservableProperty]
+    private string _formattedSelectedSize = "0 B";
+
+    [ObservableProperty]
+    private int _selectedCount;
+
+    [ObservableProperty]
+    private long _staleBytes;
+
+    [ObservableProperty]
+    private string _formattedStaleSize = "0 B";
+
+    [ObservableProperty]
+    private int _staleCount;
+
+    [ObservableProperty]
+    private string _topCategorySummary = "None";
+
+    [ObservableProperty]
+    private bool _hasSelectedItems;
+
+    [ObservableProperty]
+    private string _currentScanningPath = string.Empty;
 
     public bool HasNoItemsAndNotScanning => !IsScanning && !HasResults;
 
     public ObservableCollection<FolderItemViewModel> DisplayedItems { get; } = [];
+    public ObservableCollection<CategoryFilterItem> CategoryFilters { get; } = [];
+
+    [ObservableProperty]
+    private CategoryFilterItem? _selectedCategoryFilter;
 
     private bool CanScan => !IsScanning && !IsPurging;
-    private bool CanPurge => !IsScanning && !IsPurging && DisplayedItems.Any(i => i.IsSelected);
+    private bool CanCancelScan => IsScanning;
+    private bool CanPurge => !IsScanning && !IsPurging && HasSelectedItems;
 
     public MainViewModel()
     {
@@ -88,14 +116,48 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    partial void OnSearchTextChanged(string value)
+    {
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+
+        Task.Delay(120, token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled)
+            {
+                System.Windows.Application.Current?.Dispatcher.Invoke(ApplyFilter);
+            }
+        }, TaskScheduler.Default);
+    }
+
+    public bool IsAgeFilter0 => MinAgeFilterIndex == 0;
+    public bool IsAgeFilter1 => MinAgeFilterIndex == 1;
+    public bool IsAgeFilter2 => MinAgeFilterIndex == 2;
+    public bool IsAgeFilter3 => MinAgeFilterIndex == 3;
+
     partial void OnMinAgeFilterIndexChanged(int value)
     {
+        OnPropertyChanged(nameof(IsAgeFilter0));
+        OnPropertyChanged(nameof(IsAgeFilter1));
+        OnPropertyChanged(nameof(IsAgeFilter2));
+        OnPropertyChanged(nameof(IsAgeFilter3));
+        ApplyFilter();
+    }
+
+    partial void OnSelectedCategoryFilterChanged(CategoryFilterItem? value)
+    {
+        foreach (var c in CategoryFilters)
+        {
+            c.IsSelected = (c == value);
+        }
         ApplyFilter();
     }
 
     partial void OnIsScanningChanged(bool value)
     {
         OnPropertyChanged(nameof(HasNoItemsAndNotScanning));
+        PurgeCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnHasResultsChanged(bool value)
@@ -106,9 +168,78 @@ public partial class MainViewModel : ObservableObject
     public void UpdateSummary()
     {
         var selected = DisplayedItems.Where(i => i.IsSelected).ToList();
-        long totalBytes = selected.Sum(i => i.SizeBytes);
-        SummaryText = $"{DiscoveredFolder.FormatByteSize(totalBytes)} selected ({selected.Count} of {DisplayedItems.Count} folders)";
+        SelectedCount = selected.Count;
+        SelectedBytes = selected.Sum(i => i.SizeBytes);
+        FormattedSelectedSize = DiscoveredFolder.FormatByteSize(SelectedBytes);
+        HasSelectedItems = SelectedCount > 0;
+
+        DiscoveredCount = _allItems.Count;
+        TotalDiscoveredBytes = _allItems.Sum(i => i.SizeBytes);
+        FormattedTotalDiscoveredSize = DiscoveredFolder.FormatByteSize(TotalDiscoveredBytes);
+
+        var stale = _allItems.Where(i => i.IsStale).ToList();
+        StaleCount = stale.Count;
+        StaleBytes = stale.Sum(i => i.SizeBytes);
+        FormattedStaleSize = DiscoveredFolder.FormatByteSize(StaleBytes);
+
+        var topGroup = _allItems
+            .GroupBy(i => i.CategoryName)
+            .OrderByDescending(g => g.Sum(x => x.SizeBytes))
+            .FirstOrDefault();
+
+        TopCategorySummary = topGroup != null
+            ? $"{topGroup.Key} ({DiscoveredFolder.FormatByteSize(topGroup.Sum(x => x.SizeBytes))})"
+            : "None";
+
+        SummaryText = $"{FormattedSelectedSize} selected ({SelectedCount} of {DisplayedItems.Count} folders)";
         PurgeCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RebuildCategoryFilters()
+    {
+        CategoryFilters.Clear();
+
+        if (_allItems.Count == 0) return;
+
+        var allItem = new CategoryFilterItem
+        {
+            Name = "All",
+            ArtifactType = null,
+            Count = _allItems.Count,
+            TotalBytes = _allItems.Sum(x => x.SizeBytes),
+            IsSelected = SelectedCategoryFilter == null || SelectedCategoryFilter.ArtifactType == null,
+            AccentColor = "#38BDF8",
+            DotColor = "#38BDF8"
+        };
+        CategoryFilters.Add(allItem);
+
+        var groups = _allItems
+            .GroupBy(i => i.ArtifactType)
+            .OrderByDescending(g => g.Sum(x => x.SizeBytes));
+
+        foreach (var g in groups)
+        {
+            var first = g.First();
+            var totalBytes = g.Sum(x => x.SizeBytes);
+            var isSel = SelectedCategoryFilter?.ArtifactType == g.Key;
+
+            var cat = new CategoryFilterItem
+            {
+                Name = first.CategoryName,
+                ArtifactType = g.Key,
+                Count = g.Count(),
+                TotalBytes = totalBytes,
+                IsSelected = isSel,
+                AccentColor = first.CategoryBadgeBorder,
+                DotColor = first.CategoryBadgeBorder
+            };
+            CategoryFilters.Add(cat);
+        }
+
+        if (SelectedCategoryFilter == null)
+        {
+            SelectedCategoryFilter = allItem;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanScan))]
@@ -120,24 +251,31 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        _scanCts?.Cancel();
+        _scanCts = new CancellationTokenSource();
+        var cancellationToken = _scanCts.Token;
+
         IsScanning = true;
         HasResults = false;
+        CurrentScanningPath = TargetPath;
         StatusText = $"Scanning '{TargetPath}' for disposable build artifacts...";
         _allItems.Clear();
         DisplayedItems.Clear();
+        CategoryFilters.Clear();
         SummaryText = "Scanning...";
 
         var progress = new Progress<ScanProgress>(p =>
         {
             if (!p.IsCompleted && !string.IsNullOrEmpty(p.CurrentPath))
             {
-                StatusText = $"Discovered: {p.DiscoveredCount} folders ({DiscoveredFolder.FormatByteSize(p.TotalBytesFound)}) - {System.IO.Path.GetFileName(p.CurrentPath)}";
+                CurrentScanningPath = p.CurrentPath;
+                StatusText = $"Discovered: {p.DiscoveredCount} folders ({DiscoveredFolder.FormatByteSize(p.TotalBytesFound)}) — {System.IO.Path.GetFileName(p.CurrentPath)}";
             }
         });
 
         try
         {
-            var results = await _scanner.ScanAsync([TargetPath], progress);
+            var results = await _scanner.ScanAsync([TargetPath], progress, cancellationToken);
 
             foreach (var r in results)
             {
@@ -145,11 +283,16 @@ public partial class MainViewModel : ObservableObject
                 _allItems.Add(vm);
             }
 
+            RebuildCategoryFilters();
             ApplyFilter();
 
             HasResults = results.Count > 0;
             long totalBytes = results.Sum(r => r.SizeBytes);
             StatusText = $"Scan complete. Discovered {results.Count} disposable folders ({DiscoveredFolder.FormatByteSize(totalBytes)} reclaimable).";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Scan cancelled by user.";
         }
         catch (Exception ex)
         {
@@ -159,8 +302,16 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsScanning = false;
+            CurrentScanningPath = string.Empty;
             UpdateSummary();
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancelScan))]
+    private void CancelScan()
+    {
+        _scanCts?.Cancel();
+        StatusText = "Cancelling scan...";
     }
 
     [RelayCommand(CanExecute = nameof(CanPurge))]
@@ -174,11 +325,11 @@ public partial class MainViewModel : ObservableObject
         }
 
         long totalBytes = selected.Sum(i => i.SizeBytes);
-        var targetType = SendToRecycleBin ? "send to Windows Recycle Bin" : "PERMANENTLY delete";
+        var targetType = SendToRecycleBin ? "send to Windows Recycle Bin (Safe Undo)" : "PERMANENTLY delete";
 
         var confirm = MessageBox.Show(
-            $"Are you sure you want to {targetType} {selected.Count} folder(s)?\n\nTotal space to reclaim: {DiscoveredFolder.FormatByteSize(totalBytes)}\n\nThis will remove dependencies and compiled binaries (which can be restored or rebuilt).",
-            "Confirm Purge",
+            $"Are you sure you want to {targetType} {selected.Count} folder(s)?\n\nTotal space to reclaim: {DiscoveredFolder.FormatByteSize(totalBytes)}\n\nThis will remove dependencies and compiled binaries (which can be safely restored or rebuilt).",
+            "Confirm DevPurge Action",
             MessageBoxButton.YesNo,
             SendToRecycleBin ? MessageBoxImage.Question : MessageBoxImage.Warning
         );
@@ -201,8 +352,9 @@ public partial class MainViewModel : ObservableObject
                 progress: progress
             );
 
-            // Fast in-memory removal without flooding WPF layout passes
+            // Fast in-memory removal
             _allItems.RemoveAll(item => !Directory.Exists(item.Path));
+            RebuildCategoryFilters();
             ApplyFilter();
 
             HasResults = DisplayedItems.Count > 0;
@@ -225,7 +377,7 @@ public partial class MainViewModel : ObservableObject
             else
             {
                 MessageBox.Show(
-                    "No folders were removed. They may be locked by running IDEs or processes.",
+                    "No folders were removed. They may be locked by running IDEs or background processes.",
                     "Purge Incomplete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning
@@ -264,11 +416,36 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void SelectStale()
+    {
+        foreach (var item in DisplayedItems)
+        {
+            item.IsSelected = item.IsStale;
+        }
+        UpdateSummary();
+    }
+
+    [RelayCommand]
+    private void SelectCategory(CategoryFilterItem? category)
+    {
+        SelectedCategoryFilter = category;
+    }
+
+    [RelayCommand]
+    private void SetMinAgeFilter(string indexStr)
+    {
+        if (int.TryParse(indexStr, out int index))
+        {
+            MinAgeFilterIndex = index;
+        }
+    }
+
+    [RelayCommand]
     private void BrowsePath()
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Select Development Directory to Scan",
+            Title = "Select Development Workspace to Scan",
             InitialDirectory = Directory.Exists(TargetPath) ? TargetPath : @"C:\repos"
         };
 
@@ -302,6 +479,11 @@ public partial class MainViewModel : ObservableObject
 
         var query = _allItems.AsEnumerable();
 
+        if (SelectedCategoryFilter?.ArtifactType != null)
+        {
+            query = query.Where(item => item.ArtifactType == SelectedCategoryFilter.ArtifactType.Value);
+        }
+
         if (minDays > 0)
         {
             query = query.Where(item => item.AgeDays >= minDays);
@@ -312,17 +494,12 @@ public partial class MainViewModel : ObservableObject
             query = query.Where(item =>
                 item.FolderName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
                 item.Path.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
-                item.CategoryName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                item.CategoryName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                item.ParentDirectoryName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
             );
         }
 
         var list = query.ToList();
-
-        if (list.Count == DisplayedItems.Count && list.SequenceEqual(DisplayedItems))
-        {
-            UpdateSummary();
-            return;
-        }
 
         DisplayedItems.Clear();
         foreach (var item in list)
