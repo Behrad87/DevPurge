@@ -13,6 +13,7 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 
 **DevPurge** is built specifically for developers. It parallel-scans your workspaces to instantly locate, quantify, and batch-purge stale `node_modules`, `bin`/`obj`, Rust `target`, `.gradle`, and Python `.venv` directories in seconds.
 
+
 <p align="center">
   <img src="assets/screenshot.png?v=2" alt="DevPurge Windows 11 Fluent Dashboard" width="880" />
 </p>
