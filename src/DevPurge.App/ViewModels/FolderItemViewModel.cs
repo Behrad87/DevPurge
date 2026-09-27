@@ -54,6 +54,12 @@ public partial class FolderItemViewModel : ObservableObject
         ArtifactType.PythonVenv => "#1E3A8A",
         ArtifactType.GradleBuild => "#831843",
         ArtifactType.Vendor => "#134E4A",
+        ArtifactType.DartFlutter => "#0B2545",
+        ArtifactType.IdeCache => "#3B0764",
+        ArtifactType.CppBuild => "#172554",
+        ArtifactType.ZigBuild => "#431407",
+        ArtifactType.SwiftBuild => "#451A03",
+        ArtifactType.ElixirBuild => "#2E1065",
         _ => "#1E293B"
     };
 
@@ -65,6 +71,12 @@ public partial class FolderItemViewModel : ObservableObject
         ArtifactType.PythonVenv => "#3B82F6",
         ArtifactType.GradleBuild => "#EC4899",
         ArtifactType.Vendor => "#14B8A6",
+        ArtifactType.DartFlutter => "#0284C7",
+        ArtifactType.IdeCache => "#A855F7",
+        ArtifactType.CppBuild => "#3B82F6",
+        ArtifactType.ZigBuild => "#EA580C",
+        ArtifactType.SwiftBuild => "#F97316",
+        ArtifactType.ElixirBuild => "#9333EA",
         _ => "#334155"
     };
 
@@ -76,6 +88,12 @@ public partial class FolderItemViewModel : ObservableObject
         ArtifactType.PythonVenv => "#BFDBFE",
         ArtifactType.GradleBuild => "#FCE7F3",
         ArtifactType.Vendor => "#99F6E4",
+        ArtifactType.DartFlutter => "#BAE6FD",
+        ArtifactType.IdeCache => "#F3E8FF",
+        ArtifactType.CppBuild => "#DBEAFE",
+        ArtifactType.ZigBuild => "#FFEDD5",
+        ArtifactType.SwiftBuild => "#FFEDD5",
+        ArtifactType.ElixirBuild => "#F3E8FF",
         _ => "#94A3B8"
     };
 
@@ -87,6 +105,12 @@ public partial class FolderItemViewModel : ObservableObject
         ArtifactType.PythonVenv => "Branch24",
         ArtifactType.GradleBuild => "DualScreenSpan24",
         ArtifactType.Vendor => "Archive24",
+        ArtifactType.DartFlutter => "Branch24",
+        ArtifactType.IdeCache => "Window24",
+        ArtifactType.CppBuild => "Wrench24",
+        ArtifactType.ZigBuild => "Flash24",
+        ArtifactType.SwiftBuild => "Code24",
+        ArtifactType.ElixirBuild => "Beaker24",
         _ => "Folder24"
     };
 
@@ -97,6 +121,16 @@ public partial class FolderItemViewModel : ObservableObject
     {
         _model.IsSelected = value;
         _onSelectionChanged?.Invoke();
+    }
+
+    [ObservableProperty]
+    private double _relativeSizePercent;
+
+    public double RelativeSizeWidth => Math.Clamp((RelativeSizePercent / 100.0) * 80.0, 3.0, 80.0);
+
+    partial void OnRelativeSizePercentChanged(double value)
+    {
+        OnPropertyChanged(nameof(RelativeSizeWidth));
     }
 
     [RelayCommand]

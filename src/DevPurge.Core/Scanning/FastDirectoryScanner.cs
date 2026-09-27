@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using DevPurge.Core.Models;
 
 namespace DevPurge.Core.Scanning;
@@ -15,21 +16,32 @@ public record ScanProgress(
 /// </summary>
 public class FastDirectoryScanner
 {
-    private readonly List<PurgeRule> _rules;
-    private readonly Dictionary<string, PurgeRule> _folderNameToRuleMap;
+    private static readonly EnumerationOptions SafeTraversalOptions = new()
+    {
+        IgnoreInaccessible = true,
+        AttributesToSkip = FileAttributes.ReparsePoint,
+        RecurseSubdirectories = false
+    };
+
+    private readonly IReadOnlyList<PurgeRule> _rules;
+    private readonly FrozenDictionary<string, PurgeRule> _folderNameToRuleMap;
+    private readonly FrozenSet<string> _allowedFolderNames;
 
     public FastDirectoryScanner(IEnumerable<PurgeRule>? rules = null)
     {
         _rules = (rules ?? PurgeRule.GetDefaultRules()).Where(r => r.IsEnabled).ToList();
-        _folderNameToRuleMap = new Dictionary<string, PurgeRule>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, PurgeRule>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var rule in _rules)
         {
             foreach (var folder in rule.FolderNames)
             {
-                _folderNameToRuleMap[folder] = rule;
+                map[folder] = rule;
             }
         }
+
+        _folderNameToRuleMap = map.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        _allowedFolderNames = map.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -38,20 +50,98 @@ public class FastDirectoryScanner
     public async Task<List<DiscoveredFolder>> ScanAsync(
         IEnumerable<string> rootDirectories,
         IProgress<ScanProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IEnumerable<string>? exclusions = null)
     {
         var discovered = new ConcurrentBag<DiscoveredFolder>();
         long totalBytesFound = 0;
+        var exclusionSet = exclusions?.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var root in rootDirectories)
+        var validRoots = rootDirectories
+            .Where(r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (validRoots.Count == 1)
         {
-            if (cancellationToken.IsCancellationRequested) break;
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) continue;
+            var singleRoot = validRoots[0];
+            string rootDirName = Path.GetFileName(singleRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
-            await Task.Run(() =>
+            // If the specified root itself is a target artifact (e.g. user pointed directly to a node_modules folder)
+            if (_folderNameToRuleMap.TryGetValue(rootDirName, out var rule))
             {
-                TraverseDirectory(root, discovered, ref totalBytesFound, progress, cancellationToken);
-            }, cancellationToken);
+                var (isSafe, _) = SafetyValidator.ValidateSafeToDelete(singleRoot, _allowedFolderNames);
+                if (isSafe)
+                {
+                    var (size, fileCount, lastModified) = CalculateDirectoryStats(singleRoot, cancellationToken);
+                    discovered.Add(new DiscoveredFolder
+                    {
+                        Path = singleRoot,
+                        FolderName = rootDirName,
+                        ArtifactType = rule.ArtifactType,
+                        CategoryName = rule.CategoryName,
+                        SizeBytes = size,
+                        FileCount = fileCount,
+                        LastModifiedUtc = lastModified,
+                        IsSelected = true
+                    });
+                    Interlocked.Add(ref totalBytesFound, size);
+                    progress?.Report(new ScanProgress(singleRoot, discovered.Count, Interlocked.Read(ref totalBytesFound), true));
+                    return discovered.OrderByDescending(d => d.SizeBytes).ToList();
+                }
+            }
+
+            // Partition immediate child subdirectories for multi-core parallel scanning
+            string[] subDirs = [];
+            try
+            {
+                subDirs = Directory.GetDirectories(singleRoot, "*", SafeTraversalOptions);
+            }
+            catch { }
+
+            var validSubDirs = subDirs
+                .Where(s =>
+                {
+                    var n = Path.GetFileName(s);
+                    return !string.Equals(n, ".git", StringComparison.OrdinalIgnoreCase) &&
+                           !string.Equals(n, ".svn", StringComparison.OrdinalIgnoreCase) &&
+                           !string.Equals(n, ".hg", StringComparison.OrdinalIgnoreCase) &&
+                           (exclusionSet == null || (!exclusionSet.Contains(n) && !exclusionSet.Contains(s)));
+                })
+                .ToArray();
+
+            if (validSubDirs.Length > 1)
+            {
+                int maxParallel = Math.Max(2, Math.Min(Environment.ProcessorCount, validSubDirs.Length));
+                await Parallel.ForEachAsync(validSubDirs, new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = maxParallel,
+                    CancellationToken = cancellationToken
+                }, (subDir, ct) =>
+                {
+                    TraverseDirectory(subDir, discovered, ref totalBytesFound, progress, ct, exclusionSet);
+                    return ValueTask.CompletedTask;
+                });
+            }
+            else
+            {
+                await Task.Run(() =>
+                {
+                    TraverseDirectory(singleRoot, discovered, ref totalBytesFound, progress, cancellationToken, exclusionSet);
+                }, cancellationToken);
+            }
+        }
+        else if (validRoots.Count > 1)
+        {
+            await Parallel.ForEachAsync(validRoots, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Max(1, Math.Min(Environment.ProcessorCount, validRoots.Count)),
+                CancellationToken = cancellationToken
+            }, (root, ct) =>
+            {
+                TraverseDirectory(root, discovered, ref totalBytesFound, progress, ct, exclusionSet);
+                return ValueTask.CompletedTask;
+            });
         }
 
         progress?.Report(new ScanProgress(string.Empty, discovered.Count, Interlocked.Read(ref totalBytesFound), true));
@@ -63,7 +153,8 @@ public class FastDirectoryScanner
         ConcurrentBag<DiscoveredFolder> results,
         ref long totalBytesRef,
         IProgress<ScanProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        FrozenSet<string>? exclusionSet = null)
     {
         var stack = new Stack<string>();
         stack.Push(currentDir);
@@ -77,14 +168,24 @@ public class FastDirectoryScanner
             var dir = stack.Pop();
             string dirName = Path.GetFileName(dir);
 
-            // Skip .git directories
-            if (string.Equals(dirName, ".git", StringComparison.OrdinalIgnoreCase))
+            // Skip version control internal directories
+            if (string.Equals(dirName, ".git", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dirName, ".svn", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dirName, ".hg", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
+
+            // Skip user exclusions
+            if (exclusionSet != null && (exclusionSet.Contains(dirName) || exclusionSet.Contains(dir)))
+            {
+                continue;
+            }
 
             // Check if this directory is a matching target (e.g. node_modules, bin, obj, target, etc.)
             if (_folderNameToRuleMap.TryGetValue(dirName, out var rule))
             {
-                var (isSafe, _) = SafetyValidator.ValidateSafeToDelete(dir, _folderNameToRuleMap.Keys);
+                var (isSafe, _) = SafetyValidator.ValidateSafeToDelete(dir, _allowedFolderNames);
                 if (isSafe)
                 {
                     // Calculate size of this directory
@@ -118,15 +219,16 @@ public class FastDirectoryScanner
                 progress?.Report(new ScanProgress(dir, results.Count, Interlocked.Read(ref totalBytesRef), false));
             }
 
-            // Enumerate subdirectories
+            // Enumerate subdirectories skipping reparse points (symlinks/junctions)
             try
             {
-                var subDirs = Directory.GetDirectories(dir);
-                foreach (var sub in subDirs)
+                foreach (var sub in Directory.EnumerateDirectories(dir, "*", SafeTraversalOptions))
                 {
                     var name = Path.GetFileName(sub);
-                    // Skip hidden git folders
-                    if (!string.Equals(name, ".git", StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(name, ".git", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(name, ".svn", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(name, ".hg", StringComparison.OrdinalIgnoreCase) &&
+                        (exclusionSet == null || !exclusionSet.Contains(name)))
                     {
                         stack.Push(sub);
                     }
@@ -149,6 +251,7 @@ public class FastDirectoryScanner
 
     /// <summary>
     /// Computes recursive size, file count, and latest modified timestamp for an artifact folder.
+    /// Skips reparse points (symlinks/junctions) to prevent counting external or circular directories.
     /// </summary>
     public static (long TotalBytes, int FileCount, DateTime LastModifiedUtc) CalculateDirectoryStats(
         string directoryPath,
@@ -163,18 +266,17 @@ public class FastDirectoryScanner
             var dirInfo = new DirectoryInfo(directoryPath);
             latestModified = dirInfo.LastWriteTimeUtc;
 
-            var queue = new Queue<string>();
-            queue.Enqueue(directoryPath);
+            var queue = new Queue<DirectoryInfo>();
+            queue.Enqueue(dirInfo);
 
             while (queue.Count > 0)
             {
                 if (cancellationToken.IsCancellationRequested) break;
-                var current = queue.Dequeue();
+                var di = queue.Dequeue();
 
                 try
                 {
-                    var di = new DirectoryInfo(current);
-                    foreach (var file in di.EnumerateFiles())
+                    foreach (var file in di.EnumerateFiles("*", SafeTraversalOptions))
                     {
                         totalBytes += file.Length;
                         fileCount++;
@@ -184,9 +286,9 @@ public class FastDirectoryScanner
                         }
                     }
 
-                    foreach (var sub in di.EnumerateDirectories())
+                    foreach (var sub in di.EnumerateDirectories("*", SafeTraversalOptions))
                     {
-                        queue.Enqueue(sub.FullName);
+                        queue.Enqueue(sub);
                         if (sub.LastWriteTimeUtc > latestModified)
                         {
                             latestModified = sub.LastWriteTimeUtc;

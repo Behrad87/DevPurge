@@ -12,5 +12,11 @@ public enum ArtifactType
     PythonVenv,
     CacheAndTemp,
     Vendor,
-    Custom
+    Custom,
+    DartFlutter,
+    IdeCache,
+    CppBuild,
+    ZigBuild,
+    SwiftBuild,
+    ElixirBuild
 }

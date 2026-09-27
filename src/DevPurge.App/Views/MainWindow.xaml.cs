@@ -24,4 +24,12 @@ public partial class MainWindow : FluentWindow
             fe.ContextMenu.IsOpen = true;
         }
     }
+
+    private void StorageBar_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is ViewModels.MainViewModel vm)
+        {
+            vm.UpdateStorageBarWidth(e.NewSize.Width);
+        }
+    }
 }

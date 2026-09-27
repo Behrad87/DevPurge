@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using DevPurge.Core.Models;
 using DevPurge.Core.Scanning;
@@ -66,15 +68,14 @@ public class PurgeService
 
     #endregion
 
-    private readonly HashSet<string> _allowedFolderNames;
+    private readonly FrozenSet<string> _allowedFolderNames;
 
     public PurgeService(IEnumerable<PurgeRule>? rules = null)
     {
         var activeRules = rules ?? PurgeRule.GetDefaultRules();
-        _allowedFolderNames = new HashSet<string>(
-            activeRules.SelectMany(r => r.FolderNames),
-            StringComparer.OrdinalIgnoreCase
-        );
+        _allowedFolderNames = activeRules
+            .SelectMany(r => r.FolderNames)
+            .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -113,7 +114,7 @@ public class PurgeService
 
         if (sendToRecycleBin && RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            // Batch Recycle Bin in chunks of 50 paths to avoid shell overhead
+            // Batch Recycle Bin in chunks of 50 paths to minimize shell overhead
             const int batchSize = 50;
             var chunks = safeFolders.Chunk(batchSize).ToList();
 
@@ -136,25 +137,53 @@ public class PurgeService
                     }
                     else
                     {
-                        // Fallback: permanent parallel delete for any items that failed Recycle Bin
-                        Parallel.ForEach(chunk, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, item =>
+                        // Fallback: try individual folders in the chunk
+                        foreach (var item in chunk)
                         {
-                            try
+                            if (cancellationToken.IsCancellationRequested) break;
+
+                            if (SendToRecycleBinBatch([item.Path]))
                             {
-                                ForceDeleteDirectory(item.Path);
                                 Interlocked.Increment(ref successful);
                                 Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
                             }
-                            catch (Exception ex)
+                            else
                             {
-                                failures.Add((item.Path, ex.Message));
+                                failures.Add((item.Path, "Unable to move folder to Windows Recycle Bin. Skipping permanent deletion for safety."));
                                 Interlocked.Increment(ref failed);
                             }
-                        });
+                        }
                     }
 
                     int currentCompleted = Interlocked.Add(ref completed, chunk.Length);
                     progress?.Report((chunk.Last().Path, currentCompleted, total));
+                }
+            }, cancellationToken);
+        }
+        else if (sendToRecycleBin && (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX)))
+        {
+            await Task.Run(() =>
+            {
+                foreach (var item in safeFolders)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
+
+                    if (TryMoveToTrashUnix(item.Path))
+                    {
+                        Interlocked.Increment(ref successful);
+                        Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
+                    }
+                    else
+                    {
+                        failures.Add((item.Path, "Unable to move folder to system Trash. Skipping permanent deletion for safety."));
+                        Interlocked.Increment(ref failed);
+                    }
+
+                    int current = Interlocked.Increment(ref completed);
+                    if (current % 10 == 0 || current == total)
+                    {
+                        progress?.Report((item.Path, current, total));
+                    }
                 }
             }, cancellationToken);
         }
@@ -200,23 +229,37 @@ public class PurgeService
 
     /// <summary>
     /// Robust, high-speed directory deletion.
-    /// Fast-path tries direct deletion; fallback catches permission issues and clears read-only flags.
+    /// Fast-path tries direct deletion; fallback catches permission issues, clears read-only flags, and retries.
     /// </summary>
     public static void ForceDeleteDirectory(string path)
     {
         if (!Directory.Exists(path)) return;
 
-        try
+        const int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            // Fast path: direct recursive deletion (instant for 99% of folders)
-            Directory.Delete(path, recursive: true);
-        }
-        catch (Exception)
-        {
-            // Fallback: strip read-only attributes and retry
-            var di = new DirectoryInfo(path);
-            ClearReadOnlyAttributes(di);
-            Directory.Delete(path, recursive: true);
+            try
+            {
+                // Fast path: direct recursive deletion
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (Exception)
+            {
+                // Fallback: strip read-only attributes and retry
+                try
+                {
+                    var di = new DirectoryInfo(path);
+                    ClearReadOnlyAttributes(di);
+                    Directory.Delete(path, recursive: true);
+                    return;
+                }
+                catch when (attempt < maxRetries)
+                {
+                    // Brief delay to allow antivirus or search indexing file handles to close
+                    Thread.Sleep(50 * attempt);
+                }
+            }
         }
     }
 
@@ -229,22 +272,107 @@ public class PurgeService
                 directory.Attributes &= ~FileAttributes.ReadOnly;
             }
 
-            foreach (var file in directory.EnumerateFiles())
+            var enumOptions = new EnumerationOptions
             {
-                if (file.Attributes.HasFlag(FileAttributes.ReadOnly))
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+
+            foreach (var file in directory.EnumerateFiles("*", enumOptions))
+            {
+                try
                 {
-                    file.Attributes &= ~FileAttributes.ReadOnly;
+                    if (file.Attributes.HasFlag(FileAttributes.ReadOnly))
+                    {
+                        file.Attributes &= ~FileAttributes.ReadOnly;
+                    }
+                }
+                catch
+                {
+                    // Continue with remaining files
                 }
             }
 
-            foreach (var sub in directory.EnumerateDirectories())
+            foreach (var sub in directory.EnumerateDirectories("*", enumOptions))
             {
-                ClearReadOnlyAttributes(sub);
+                try
+                {
+                    if (sub.Attributes.HasFlag(FileAttributes.ReadOnly))
+                    {
+                        sub.Attributes &= ~FileAttributes.ReadOnly;
+                    }
+                }
+                catch
+                {
+                    // Continue with remaining directories
+                }
             }
         }
         catch
         {
             // Best effort attribute clearing
         }
+    }
+
+    private static bool TryMoveToTrashUnix(string path)
+    {
+        if (!Directory.Exists(path)) return true;
+
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "gio",
+                    Arguments = $"trash \"{path}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var p = Process.Start(psi);
+                if (p != null)
+                {
+                    p.WaitForExit(5000);
+                    if (p.ExitCode == 0) return true;
+                }
+
+                psi.FileName = "trash-put";
+                psi.Arguments = $"\"{path}\"";
+                using var p2 = Process.Start(psi);
+                if (p2 != null)
+                {
+                    p2.WaitForExit(5000);
+                    if (p2.ExitCode == 0) return true;
+                }
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                var script = $"tell application \"Finder\" to delete POSIX file \"{path}\"";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "osascript",
+                    Arguments = $"-e '{script}'",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var p = Process.Start(psi);
+                if (p != null)
+                {
+                    p.WaitForExit(5000);
+                    if (p.ExitCode == 0) return true;
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort invocation of trash command
+        }
+
+        return false;
     }
 }

@@ -195,6 +195,45 @@ public partial class MainViewModel : ObservableObject
         PurgeCommand.NotifyCanExecuteChanged();
     }
 
+    public IEnumerable<CategoryFilterItem> EcosystemSegments => CategoryFilters.Where(c => c.ArtifactType != null && c.TotalBytes > 0);
+
+    private double _lastBarWidth = 600;
+
+    public void UpdateStorageBarWidth(double availableWidth)
+    {
+        if (availableWidth > 20)
+        {
+            _lastBarWidth = availableWidth;
+        }
+
+        if (TotalDiscoveredBytes <= 0) return;
+
+        var segments = EcosystemSegments.ToList();
+        if (segments.Count == 0) return;
+
+        double spacing = (segments.Count - 1) * 2;
+        double usableWidth = Math.Max(20, _lastBarWidth - spacing);
+
+        foreach (var seg in segments)
+        {
+            seg.Percentage = (double)seg.TotalBytes / TotalDiscoveredBytes * 100.0;
+            seg.PixelWidth = Math.Max(6, (seg.Percentage / 100.0) * usableWidth);
+        }
+        OnPropertyChanged(nameof(EcosystemSegments));
+    }
+
+    private void UpdateRelativeSizes()
+    {
+        if (_allItems.Count == 0) return;
+        long maxBytes = _allItems.Max(x => x.SizeBytes);
+        if (maxBytes <= 0) maxBytes = 1;
+
+        foreach (var item in _allItems)
+        {
+            item.RelativeSizePercent = Math.Clamp((double)item.SizeBytes / maxBytes * 100.0, 3.0, 100.0);
+        }
+    }
+
     private void RebuildCategoryFilters()
     {
         CategoryFilters.Clear();
@@ -217,6 +256,8 @@ public partial class MainViewModel : ObservableObject
             .GroupBy(i => i.ArtifactType)
             .OrderByDescending(g => g.Sum(x => x.SizeBytes));
 
+        long totalDiscovered = _allItems.Sum(x => x.SizeBytes);
+
         foreach (var g in groups)
         {
             var first = g.First();
@@ -231,7 +272,8 @@ public partial class MainViewModel : ObservableObject
                 TotalBytes = totalBytes,
                 IsSelected = isSel,
                 AccentColor = first.CategoryBadgeBorder,
-                DotColor = first.CategoryBadgeBorder
+                DotColor = first.CategoryBadgeBorder,
+                Percentage = totalDiscovered > 0 ? (double)totalBytes / totalDiscovered * 100.0 : 0
             };
             CategoryFilters.Add(cat);
         }
@@ -240,6 +282,9 @@ public partial class MainViewModel : ObservableObject
         {
             SelectedCategoryFilter = allItem;
         }
+
+        UpdateStorageBarWidth(_lastBarWidth);
+        OnPropertyChanged(nameof(EcosystemSegments));
     }
 
     public void LoadSampleResults(IEnumerable<DiscoveredFolder> samples)
@@ -250,6 +295,7 @@ public partial class MainViewModel : ObservableObject
         {
             _allItems.Add(new FolderItemViewModel(s, UpdateSummary));
         }
+        UpdateRelativeSizes();
         RebuildCategoryFilters();
         ApplyFilter();
         HasResults = true;
@@ -297,6 +343,7 @@ public partial class MainViewModel : ObservableObject
                 _allItems.Add(vm);
             }
 
+            UpdateRelativeSizes();
             RebuildCategoryFilters();
             ApplyFilter();
 

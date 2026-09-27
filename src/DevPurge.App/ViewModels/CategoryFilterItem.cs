@@ -19,9 +19,19 @@ public partial class CategoryFilterItem : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    [ObservableProperty]
+    private double _percentage;
+
+    [ObservableProperty]
+    private double _pixelWidth = 0;
+
     public string FormattedSize => DiscoveredFolder.FormatByteSize(TotalBytes);
 
     public string DisplayText => TotalBytes > 0
         ? $"{Name} ({FormattedSize})"
         : Name;
+
+    public string ToolTipText => TotalBytes > 0
+        ? $"{Name}: {FormattedSize} ({Percentage:F1}% of discovered space) — Click to filter"
+        : $"{Name} — Click to filter";
 }

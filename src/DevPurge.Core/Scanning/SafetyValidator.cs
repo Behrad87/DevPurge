@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace DevPurge.Core.Scanning;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace DevPurge.Core.Scanning;
 /// </summary>
 public static class SafetyValidator
 {
-    private static readonly HashSet<string> SystemFolderBlacklist = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenSet<string> SystemFolderBlacklist = new[]
     {
         "windows",
         "system32",
@@ -17,21 +19,65 @@ public static class SafetyValidator
         "system volume information",
         "$recycle.bin",
         "boot",
-        "users",
-        "documents and settings",
-        "appdata"
-    };
+        "$windows.~bt",
+        "$windows.~ws",
+        "msocache",
+        "config.msi"
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> ProtectedFileSignatures = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly FrozenSet<string> ProtectedFileSignatures = new[]
     {
         ".git",
+        ".gitmodules",
         "package.json",
         "cargo.toml",
         "pom.xml",
         "build.gradle",
+        "build.gradle.kts",
         "solution.sln",
-        "devpurge.sln"
-    };
+        "devpurge.sln",
+        "go.mod",
+        "pyproject.toml",
+        "composer.json",
+        "cmakelists.txt",
+        "directory.build.props",
+        "directory.build.targets",
+        "global.json"
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly FrozenSet<string> ProtectedUserSpecialFolders = GetProtectedUserFolders();
+
+    private static FrozenSet<string> GetProtectedUserFolders()
+    {
+        var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Environment.SpecialFolder[] targetFolders =
+        [
+            Environment.SpecialFolder.UserProfile,
+            Environment.SpecialFolder.Desktop,
+            Environment.SpecialFolder.MyDocuments,
+            Environment.SpecialFolder.MyMusic,
+            Environment.SpecialFolder.MyPictures,
+            Environment.SpecialFolder.MyVideos
+        ];
+
+        foreach (var folder in targetFolders)
+        {
+            try
+            {
+                var path = Environment.GetFolderPath(folder);
+                if (!string.IsNullOrEmpty(path))
+                {
+                    folders.Add(Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                }
+            }
+            catch
+            {
+                // Ignore environment resolution issues on non-standard platforms
+            }
+        }
+
+        return folders.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Checks if a folder path is strictly safe to be purged.
@@ -50,15 +96,14 @@ public static class SafetyValidator
             if (string.Equals(fullPath, root?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
                 return (false, "Cannot delete root drive directory.");
 
-            // 2. Never delete user profile root directly
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrEmpty(userProfile) && string.Equals(fullPath, userProfile, StringComparison.OrdinalIgnoreCase))
-                return (false, "Cannot delete user profile folder.");
+            // 2. Never delete user profile root or personal library folders directly
+            if (ProtectedUserSpecialFolders.Contains(fullPath))
+                return (false, "Cannot delete user profile or personal library folder.");
 
             // 2b. Unix / Linux system root protections
             var rawNormalized = folderPath.Trim().Replace('\\', '/');
             var normalized = fullPath.Replace('\\', '/');
-            bool isLinuxSystem = rawNormalized == "/bin" || rawNormalized == "/sbin" || rawNormalized == "/usr/bin" ||
+            bool isLinuxOrUnixSystem = rawNormalized == "/bin" || rawNormalized == "/sbin" || rawNormalized == "/usr/bin" ||
                 rawNormalized.StartsWith("/etc", StringComparison.OrdinalIgnoreCase) ||
                 rawNormalized.StartsWith("/var", StringComparison.OrdinalIgnoreCase) ||
                 rawNormalized.StartsWith("/usr", StringComparison.OrdinalIgnoreCase) ||
@@ -66,22 +111,46 @@ public static class SafetyValidator
                 rawNormalized.StartsWith("/proc", StringComparison.OrdinalIgnoreCase) ||
                 rawNormalized.StartsWith("/dev", StringComparison.OrdinalIgnoreCase) ||
                 rawNormalized.StartsWith("/boot", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/System", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/Library", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/Applications", StringComparison.OrdinalIgnoreCase) ||
+                rawNormalized.StartsWith("/private", StringComparison.OrdinalIgnoreCase) ||
                 normalized == "/bin" || normalized == "/sbin" || normalized == "/usr/bin" ||
                 normalized.StartsWith("/etc", StringComparison.OrdinalIgnoreCase) ||
                 normalized.StartsWith("/var", StringComparison.OrdinalIgnoreCase) ||
-                normalized.StartsWith("/usr", StringComparison.OrdinalIgnoreCase);
+                normalized.StartsWith("/usr", StringComparison.OrdinalIgnoreCase) ||
+                normalized.StartsWith("/System", StringComparison.OrdinalIgnoreCase) ||
+                normalized.StartsWith("/Library", StringComparison.OrdinalIgnoreCase);
 
-            if (isLinuxSystem)
+            if (isLinuxOrUnixSystem)
             {
                 return (false, "Cannot delete Linux root system directory.");
             }
 
             // 3. Check against system folder blacklist
-            var segments = fullPath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            var tempPath = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            bool isInTemp = !string.IsNullOrEmpty(tempPath) && fullPath.StartsWith(tempPath, StringComparison.OrdinalIgnoreCase);
+
+            var segments = fullPath.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
             foreach (var segment in segments)
             {
                 if (SystemFolderBlacklist.Contains(segment))
                     return (false, $"Path contains protected system folder component: '{segment}'.");
+
+                if (string.Equals(segment, "appdata", StringComparison.OrdinalIgnoreCase) && !isInTemp)
+                    return (false, $"Path contains protected system folder component: '{segment}'.");
+            }
+
+            // 3b. Prevent deleting root Users / Documents and Settings directory directly
+            if (root != null)
+            {
+                var usersDir = Path.Combine(root, "Users").TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var docAndSettings = Path.Combine(root, "Documents and Settings").TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (string.Equals(fullPath, usersDir, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fullPath, docAndSettings, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (false, "Cannot delete system Users root directory.");
+                }
             }
 
             // 4. Never delete .git folder
@@ -90,7 +159,10 @@ public static class SafetyValidator
                 return (false, "Cannot delete .git repository directory.");
 
             // 5. Must match one of the allowed target folder names
-            var allowedSet = new HashSet<string>(allowedFolderNames, StringComparer.OrdinalIgnoreCase);
+            var allowedSet = allowedFolderNames is FrozenSet<string> fs
+                ? fs
+                : allowedFolderNames.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
             if (!allowedSet.Contains(folderName))
                 return (false, $"Folder name '{folderName}' is not in the allowed purge target list.");
 
@@ -98,19 +170,36 @@ public static class SafetyValidator
             // Don't delete if it contains source project manifests like package.json, Cargo.toml or .sln directly inside it
             if (Directory.Exists(fullPath))
             {
+                // Check if directory contains a solution file (.sln or modern .slnx)
+                if (Directory.EnumerateFiles(fullPath, "*.sln").Any() || Directory.EnumerateFiles(fullPath, "*.slnx").Any())
+                {
+                    return (false, "Directory contains a solution (.sln/.slnx) file; aborting deletion for safety.");
+                }
+
+                // Check if directory contains a .NET project file (*.csproj, *.fsproj, *.vbproj)
+                if (Directory.EnumerateFiles(fullPath, "*.*proj").Any(f =>
+                    f.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) ||
+                    f.EndsWith(".fsproj", StringComparison.OrdinalIgnoreCase) ||
+                    f.EndsWith(".vbproj", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return (false, "Directory contains a .NET project file (*.csproj/fsproj/vbproj); aborting deletion for safety.");
+                }
+
+                // Check if directory contains a VCS repository root (.git, .svn, .hg)
+                if (Directory.Exists(Path.Combine(fullPath, ".git")) || File.Exists(Path.Combine(fullPath, ".git")) ||
+                    Directory.Exists(Path.Combine(fullPath, ".svn")) || Directory.Exists(Path.Combine(fullPath, ".hg")))
+                {
+                    return (false, "Directory contains a repository root (.git/.svn/.hg); aborting deletion for safety.");
+                }
+
                 foreach (var signature in ProtectedFileSignatures)
                 {
-                    if (signature.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+                    if (signature.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) || signature.Equals(".git", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (Directory.EnumerateFiles(fullPath, "*.sln").Any())
-                            return (false, "Directory contains a solution (.sln) file; aborting deletion for safety.");
+                        continue;
                     }
-                    else if (signature.Equals(".git", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (Directory.Exists(Path.Combine(fullPath, ".git")))
-                            return (false, "Directory contains a .git repository root; aborting deletion for safety.");
-                    }
-                    else if (File.Exists(Path.Combine(fullPath, signature)))
+
+                    if (File.Exists(Path.Combine(fullPath, signature)))
                     {
                         // Exception: node_modules might occasionally have package.json inside some sub-package,
                         // but if a folder named 'bin' or 'target' has package.json or cargo.toml, it's a project root!

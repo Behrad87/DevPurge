@@ -39,13 +39,18 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 
 | Ecosystem | Target Directories |
 | :--- | :--- |
-| **JavaScript / TypeScript** | `node_modules`, `.next`, `.nuxt`, `.turbo`, `.cache` |
-| **.NET / C#** | `bin`, `obj`, `TestResults` |
+| **JavaScript / TypeScript** | `node_modules`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.svelte-kit`, `dist`, `.angular`, `.astro`, `.parcel-cache` |
+| **.NET / C#** | `bin`, `obj`, `TestResults`, `BenchmarkDotNet.Artifacts` |
 | **Rust / Cargo** | `target` |
 | **Java / Android / Gradle** | `build`, `.gradle` |
-| **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache` |
+| **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.tox`, `htmlcov` |
 | **PHP / Go** | `vendor` |
-| **Visual Studio** | `.vs` |
+| **Visual Studio / IDE Caches** | `.vs`, `.idea` |
+| **Dart / Flutter** | `.dart_tool` |
+| **C++ / CMake** | `cmake-build-debug`, `cmake-build-release`, `.cxx` |
+| **Zig** | `zig-cache`, `zig-out` |
+| **Swift / Apple** | `DerivedData` |
+| **Elixir** | `_build` |
 
 ## 📦 Downloads (v1.1.0)
 
@@ -88,10 +93,19 @@ DevPurge.Cli --path C:\repos
 # Purge folders untouched for more than 14 days
 DevPurge.Cli --path C:\repos --clean --min-age 14
 
+# Clean only specific ecosystem artifacts (e.g. node_modules)
+DevPurge.Cli --path C:\repos --clean --type node
+
+# Exclude specific repositories or folders from scanning
+DevPurge.Cli --path C:\repos --clean --exclude "legacy-app,temp-work"
+
 # Permanent deletion (bypasses Windows Recycle Bin)
 DevPurge.Cli --path C:\repos --clean --permanent
 
-# Silent execution (suitable for scripts)
+# Output structured JSON (ideal for CI/CD or automation scripts)
+DevPurge.Cli --path C:\repos,D:\repos --json
+
+# Silent execution (suitable for background cron/scheduled tasks)
 DevPurge.Cli --path C:\repos --clean --min-age 30 --silent
 ```
 
