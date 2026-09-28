@@ -186,4 +186,14 @@ public class FastDirectoryScannerTests : IDisposable
         Assert.Contains(results, r => r.Path.Contains("ProjectC"));
         Assert.DoesNotContain(results, r => r.Path.Contains("ProjectB"));
     }
+
+    [Fact]
+    public void CalculateDirectoryStats_NonExistentDirectory_ReturnsZero()
+    {
+        var nonExistent = Path.Combine(_testRoot, "does_not_exist");
+        var (totalBytes, fileCount, _) = FastDirectoryScanner.CalculateDirectoryStats(nonExistent);
+
+        Assert.Equal(0, totalBytes);
+        Assert.Equal(0, fileCount);
+    }
 }

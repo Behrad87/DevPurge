@@ -37,6 +37,11 @@ public class SafetyValidatorTests
     [InlineData("/usr/bin")]
     [InlineData("/etc/nginx")]
     [InlineData("/var/log/node_modules")]
+    [InlineData("/opt")]
+    [InlineData("/root")]
+    [InlineData("/lib")]
+    [InlineData("/lib64")]
+    [InlineData("/Volumes")]
     public void CannotDeleteLinuxSystemDirectories(string linuxPath)
     {
         var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(linuxPath, AllowedFolderNames);
@@ -213,6 +218,28 @@ public class SafetyValidatorTests
     }
 
     [Fact]
+    public void DirectoryWithVcxprojIsRejected()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "devpurge_test_vcxproj_" + Guid.NewGuid().ToString("N"), "bin");
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            File.WriteAllText(Path.Combine(tempDir, "NativeApp.vcxproj"), "<Project DefaultTargets=\"Build\" />");
+
+            var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(tempDir, AllowedFolderNames);
+            Assert.False(isSafe);
+            Assert.Contains("project file", reason, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(Path.GetDirectoryName(tempDir)!, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void DirectoryWithPyprojectTomlIsRejected()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "devpurge_test_pyproj_" + Guid.NewGuid().ToString("N"), "target");
@@ -274,6 +301,188 @@ public class SafetyValidatorTests
             if (Directory.Exists(tempDir))
             {
                 Directory.Delete(Path.GetDirectoryName(tempDir)!, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("mix.exs")]
+    [InlineData("pubspec.yaml")]
+    [InlineData("build.zig")]
+    [InlineData("package.swift")]
+    [InlineData("gemfile")]
+    [InlineData("deno.json")]
+    [InlineData("deno.jsonc")]
+    public void DirectoryWithModernProjectManifestIsRejected(string manifestFileName)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "devpurge_test_manifest_" + Guid.NewGuid().ToString("N"), "bin");
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            File.WriteAllText(Path.Combine(tempDir, manifestFileName), "manifest content");
+
+            var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(tempDir, AllowedFolderNames);
+            Assert.False(isSafe);
+            Assert.Contains("project manifest", reason, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(Path.GetDirectoryName(tempDir)!, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("perflogs", true)]
+    [InlineData("windows", true)]
+    [InlineData("program files", true)]
+    [InlineData("System Volume Information", true)]
+    [InlineData("$recycle.bin", true)]
+    [InlineData("node_modules", false)]
+    [InlineData("bin", false)]
+    [InlineData("my-project", false)]
+    public void IsSystemBlacklisted_IdentifiesBlacklistedFolders(string folderName, bool expected)
+    {
+        Assert.Equal(expected, SafetyValidator.IsSystemBlacklisted(folderName));
+    }
+
+    [Theory]
+    [InlineData("coverage", true)]
+    [InlineData(".nyc_output", true)]
+    [InlineData("tmp_build", true)]
+    [InlineData(".turbo", true)]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    [InlineData("windows", false)]
+    [InlineData("system32", false)]
+    [InlineData("program files", false)]
+    [InlineData("appdata", false)]
+    [InlineData(".git", false)]
+    [InlineData(".svn", false)]
+    [InlineData(".hg", false)]
+    [InlineData(".", false)]
+    [InlineData("..", false)]
+    [InlineData("sub/folder", false)]
+    [InlineData("sub\\folder", false)]
+    [InlineData("C:", false)]
+    [InlineData("CON", false)]
+    [InlineData("NUL", false)]
+    [InlineData("users", false)]
+    [InlineData(".nextcloud", false)]
+    public void ValidateCustomRuleFolder_ValidatesCorrectly(string folderName, bool expectedValid)
+    {
+        var (isValid, error) = SafetyValidator.ValidateCustomRuleFolder(folderName);
+        Assert.Equal(expectedValid, isValid);
+        if (!expectedValid)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(error));
+        }
+    }
+
+    [Theory]
+    [InlineData(@"\\wsl$\Ubuntu")]
+    [InlineData(@"\\wsl.localhost\Debian")]
+    [InlineData(@"//wsl$/Ubuntu")]
+    [InlineData(@"//wsl.localhost/openSUSE")]
+    public void CannotDeleteWslDistributionRoot(string wslRoot)
+    {
+        var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(wslRoot, AllowedFolderNames);
+        Assert.False(isSafe);
+        Assert.NotNull(reason);
+        Assert.Contains("WSL", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(@"\\wsl$\Ubuntu\bin")]
+    [InlineData(@"\\wsl$\Ubuntu\sbin")]
+    [InlineData(@"\\wsl$\Ubuntu\etc")]
+    [InlineData(@"\\wsl$\Ubuntu\var")]
+    [InlineData(@"\\wsl.localhost\Debian\usr\bin")]
+    [InlineData(@"\\wsl.localhost\Ubuntu\boot")]
+    public void CannotDeleteWslLinuxSystemDirectories(string wslSysDir)
+    {
+        var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(wslSysDir, AllowedFolderNames);
+        Assert.False(isSafe);
+        Assert.NotNull(reason);
+        Assert.Contains("WSL", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CanDeleteWslUserWorkspaceArtifacts()
+    {
+        var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(@"\\wsl$\Ubuntu\home\dev\myproject\node_modules", AllowedFolderNames);
+        Assert.True(isSafe);
+        Assert.Null(reason);
+    }
+
+    [Theory]
+    [InlineData(@"D:\repos\MyProject\.dropbox")]
+    [InlineData(@"D:\repos\MyProject\.dropbox.cache")]
+    [InlineData(@"D:\repos\MyProject\.onedrive")]
+    [InlineData(@"D:\repos\MyProject\.nextcloud")]
+    public void CannotDeleteCloudMetadataFolders(string cloudDir)
+    {
+        var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(cloudDir, AllowedFolderNames);
+        Assert.False(isSafe);
+        Assert.NotNull(reason);
+    }
+
+    [Theory]
+    [InlineData("Dockerfile")]
+    [InlineData("docker-compose.yml")]
+    [InlineData("docker-compose.yaml")]
+    [InlineData("pnpm-lock.yaml")]
+    [InlineData("yarn.lock")]
+    [InlineData("cargo.lock")]
+    [InlineData("poetry.lock")]
+    [InlineData("requirements.txt")]
+    [InlineData("main.tf")]
+    [InlineData("flake.nix")]
+    [InlineData("go.work")]
+    [InlineData("deno.lock")]
+    [InlineData("uv.lock")]
+    [InlineData("pdm.lock")]
+    [InlineData("flake.lock")]
+    [InlineData("pipfile.lock")]
+    [InlineData("tsconfig.json")]
+    [InlineData("nuget.config")]
+    public void DirectoryWithExtendedManifests_IsRejected(string manifestName)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "devpurge_test_ext_man_" + Guid.NewGuid().ToString("N"), "bin");
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            File.WriteAllText(Path.Combine(tempDir, manifestName), "sample content");
+
+            var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(tempDir, AllowedFolderNames);
+            Assert.False(isSafe);
+            Assert.Contains("project manifest", reason, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(Path.GetDirectoryName(tempDir)!, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void IsReparsePoint_ReturnsFalseForNormalDirectory()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "devpurge_test_normal_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            Assert.False(SafetyValidator.IsReparsePoint(tempDir));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir);
             }
         }
     }

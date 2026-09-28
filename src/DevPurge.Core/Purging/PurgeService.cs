@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using DevPurge.Core.Auditing;
 using DevPurge.Core.Models;
 using DevPurge.Core.Scanning;
 
@@ -85,7 +86,9 @@ public class PurgeService
         IEnumerable<DiscoveredFolder> folders,
         bool sendToRecycleBin = true,
         IProgress<(string Path, int Completed, int Total)>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        AuditLogger? auditLogger = null,
+        string? customAuditLogPath = null)
     {
         var list = folders.ToList();
         int total = list.Count;
@@ -131,8 +134,16 @@ public class PurgeService
                     {
                         foreach (var item in chunk)
                         {
-                            Interlocked.Increment(ref successful);
-                            Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
+                            if (!Directory.Exists(item.Path))
+                            {
+                                Interlocked.Increment(ref successful);
+                                Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
+                            }
+                            else
+                            {
+                                failures.Add((item.Path, "Folder still exists after attempting to move to Windows Recycle Bin."));
+                                Interlocked.Increment(ref failed);
+                            }
                         }
                     }
                     else
@@ -142,7 +153,7 @@ public class PurgeService
                         {
                             if (cancellationToken.IsCancellationRequested) break;
 
-                            if (SendToRecycleBinBatch([item.Path]))
+                            if (SendToRecycleBinBatch([item.Path]) && !Directory.Exists(item.Path))
                             {
                                 Interlocked.Increment(ref successful);
                                 Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
@@ -168,7 +179,7 @@ public class PurgeService
                 {
                     if (cancellationToken.IsCancellationRequested) break;
 
-                    if (TryMoveToTrashUnix(item.Path))
+                    if (TryMoveToTrashUnix(item.Path) && !Directory.Exists(item.Path))
                     {
                         Interlocked.Increment(ref successful);
                         Interlocked.Add(ref reclaimedBytes, item.SizeBytes);
@@ -224,7 +235,126 @@ public class PurgeService
         }
 
         progress?.Report((string.Empty, total, total));
-        return new DeletionReport(total, successful, failed, reclaimedBytes, failures.ToList());
+        var report = new DeletionReport(total, successful, failed, reclaimedBytes, failures.ToList());
+
+        if (auditLogger != null)
+        {
+            try
+            {
+                var targetRoots = list.Select(f => Path.GetDirectoryName(f.Path) ?? f.Path).Distinct().ToList();
+                var purgedPaths = safeFolders.Select(f => f.Path).ToList();
+                await auditLogger.LogPurgeAsync(report, sendToRecycleBin, isDryRun: false, targetRoots, purgedPaths, customAuditLogPath);
+            }
+            catch
+            {
+                // Never let audit logging failure fail the purge operation itself
+            }
+        }
+
+        return report;
+    }
+
+    /// <summary>
+    /// Performs non-destructive dry-run verification on target folders.
+    /// Validates safety rules, existence, and checks for active file handle locks without deleting or altering files.
+    /// </summary>
+    public async Task<DryRunReport> SimulatePurgeAsync(
+        IEnumerable<DiscoveredFolder> folders,
+        CancellationToken cancellationToken = default)
+    {
+        var list = folders.ToList();
+        var items = new List<DryRunItem>();
+        int eligible = 0;
+        int @unsafe = 0;
+        int locked = 0;
+        long eligibleBytes = 0;
+
+        await Task.Run(() =>
+        {
+            foreach (var folder in list)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+
+                // 1. Validate safety
+                var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(folder.Path, _allowedFolderNames);
+                if (!isSafe)
+                {
+                    items.Add(new DryRunItem(folder.Path, folder.FolderName, folder.CategoryName, folder.SizeBytes, folder.FormattedSize, DryRunStatus.Unsafe, reason));
+                    @unsafe++;
+                    continue;
+                }
+
+                // 2. Validate existence
+                if (!Directory.Exists(folder.Path))
+                {
+                    items.Add(new DryRunItem(folder.Path, folder.FolderName, folder.CategoryName, folder.SizeBytes, folder.FormattedSize, DryRunStatus.NotFound, "Directory not found on disk."));
+                    continue;
+                }
+
+                // 3. Inspect accessibility and file locks (non-destructive check)
+                var (isLocked, lockReason) = CheckDirectoryLock(folder.Path);
+                if (isLocked)
+                {
+                    items.Add(new DryRunItem(folder.Path, folder.FolderName, folder.CategoryName, folder.SizeBytes, folder.FormattedSize, DryRunStatus.LockedOrInaccessible, lockReason));
+                    locked++;
+                    continue;
+                }
+
+                items.Add(new DryRunItem(folder.Path, folder.FolderName, folder.CategoryName, folder.SizeBytes, folder.FormattedSize, DryRunStatus.Eligible, null));
+                eligible++;
+                eligibleBytes += folder.SizeBytes;
+            }
+        }, cancellationToken);
+
+        return new DryRunReport(list.Count, eligible, @unsafe, locked, eligibleBytes, items);
+    }
+
+    private static (bool IsLocked, string? Reason) CheckDirectoryLock(string path)
+    {
+        try
+        {
+            var enumOptions = new EnumerationOptions
+            {
+                IgnoreInaccessible = false,
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+
+            int checkedCount = 0;
+            foreach (var file in Directory.EnumerateFiles(path, "*", enumOptions))
+            {
+                if (++checkedCount > 10) break;
+
+                try
+                {
+                    var fi = new FileInfo(file);
+                    var access = fi.Attributes.HasFlag(FileAttributes.ReadOnly) ? FileAccess.Read : FileAccess.ReadWrite;
+                    using var stream = new FileStream(file, FileMode.Open, access, FileShare.None);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    var fi = new FileInfo(file);
+                    if (!fi.Attributes.HasFlag(FileAttributes.ReadOnly))
+                    {
+                        return (true, $"File access denied: {Path.GetFileName(file)}");
+                    }
+                }
+                catch (IOException ex) when (ex.HResult != 0)
+                {
+                    return (true, $"File locked by running process: {Path.GetFileName(file)}");
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return (true, "Directory access denied (insufficient permissions).");
+        }
+        catch (Exception ex)
+        {
+            return (true, $"Lock check warning: {ex.Message}");
+        }
+
+        return (false, null);
     }
 
     /// <summary>
@@ -236,6 +366,8 @@ public class PurgeService
         if (!Directory.Exists(path)) return;
 
         const int maxRetries = 3;
+        Exception? lastException = null;
+
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
             try
@@ -244,8 +376,9 @@ public class PurgeService
                 Directory.Delete(path, recursive: true);
                 return;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                lastException = ex;
                 // Fallback: strip read-only attributes and retry
                 try
                 {
@@ -254,12 +387,21 @@ public class PurgeService
                     Directory.Delete(path, recursive: true);
                     return;
                 }
-                catch when (attempt < maxRetries)
+                catch (Exception retryEx)
                 {
-                    // Brief delay to allow antivirus or search indexing file handles to close
-                    Thread.Sleep(50 * attempt);
+                    lastException = retryEx;
+                    if (attempt < maxRetries)
+                    {
+                        // Brief delay to allow antivirus or search indexing file handles to close
+                        Thread.Sleep(50 * attempt);
+                    }
                 }
             }
+        }
+
+        if (Directory.Exists(path))
+        {
+            throw new IOException($"Directory '{path}' could not be deleted after {maxRetries} attempts.", lastException);
         }
     }
 
@@ -326,12 +468,13 @@ public class PurgeService
                 var psi = new ProcessStartInfo
                 {
                     FileName = "gio",
-                    Arguments = $"trash \"{path}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
+                psi.ArgumentList.Add("trash");
+                psi.ArgumentList.Add(path);
                 using var p = Process.Start(psi);
                 if (p != null)
                 {
@@ -339,9 +482,16 @@ public class PurgeService
                     if (p.ExitCode == 0) return true;
                 }
 
-                psi.FileName = "trash-put";
-                psi.Arguments = $"\"{path}\"";
-                using var p2 = Process.Start(psi);
+                var psi2 = new ProcessStartInfo
+                {
+                    FileName = "trash-put",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                psi2.ArgumentList.Add(path);
+                using var p2 = Process.Start(psi2);
                 if (p2 != null)
                 {
                     p2.WaitForExit(5000);
@@ -350,16 +500,17 @@ public class PurgeService
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                var script = $"tell application \"Finder\" to delete POSIX file \"{path}\"";
+                var script = $"tell application \"Finder\" to delete POSIX file \"{path.Replace("\"", "\\\"")}\"";
                 var psi = new ProcessStartInfo
                 {
                     FileName = "osascript",
-                    Arguments = $"-e '{script}'",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
+                psi.ArgumentList.Add("-e");
+                psi.ArgumentList.Add(script);
                 using var p = Process.Start(psi);
                 if (p != null)
                 {

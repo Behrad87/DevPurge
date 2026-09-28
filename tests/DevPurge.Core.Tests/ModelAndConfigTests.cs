@@ -37,6 +37,27 @@ public class ModelAndConfigTests
         Assert.Contains(rules, r => r.FolderNames.Contains("BenchmarkDotNet.Artifacts"));
         Assert.Contains(rules, r => r.FolderNames.Contains(".ruff_cache"));
         Assert.Contains(rules, r => r.FolderNames.Contains(".angular"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".vite"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".nx"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".docusaurus"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".kotlin"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".nox"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".hypothesis"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".fleet"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".uv_cache"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".uv"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".pixi"));
+        Assert.Contains(rules, r => r.FolderNames.Contains("__pypackages__"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".rollup.cache"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".swc"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".rspack-cache"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".nyc_output"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".gocache"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".bloop"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".metals"));
+        Assert.Contains(rules, r => r.FolderNames.Contains("cmake-build-relwithdebinfo"));
+        Assert.Contains(rules, r => r.FolderNames.Contains("cmake-build-minsizerel"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".build"));
     }
 
     [Fact]
@@ -134,6 +155,18 @@ public class ModelAndConfigTests
         Assert.True(PurgeRule.TryMatchFolder("bin", out var binRule));
         Assert.NotNull(binRule);
         Assert.Equal(ArtifactType.DotNetBuild, binRule.ArtifactType);
+
+        Assert.True(PurgeRule.TryMatchFolder(".vite", out var viteRule));
+        Assert.NotNull(viteRule);
+        Assert.Equal(ArtifactType.CacheAndTemp, viteRule.ArtifactType);
+
+        Assert.True(PurgeRule.TryMatchFolder(".nx", out var nxRule));
+        Assert.NotNull(nxRule);
+        Assert.Equal(ArtifactType.CacheAndTemp, nxRule.ArtifactType);
+
+        Assert.True(PurgeRule.TryMatchFolder(".kotlin", out var kotlinRule));
+        Assert.NotNull(kotlinRule);
+        Assert.Equal(ArtifactType.GradleBuild, kotlinRule.ArtifactType);
 
         Assert.False(PurgeRule.TryMatchFolder("src", out var srcRule));
         Assert.Null(srcRule);

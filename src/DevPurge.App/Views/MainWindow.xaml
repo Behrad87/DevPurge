@@ -71,6 +71,13 @@
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#38BDF8" />
+                                <Setter TargetName="border" Property="BorderThickness" Value="1.5" />
+                                <Setter TargetName="border" Property="Background" Value="#2538BDF8" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="#2D3748" />
                                 <Setter TargetName="border" Property="BorderBrush" Value="#38BDF8" />
@@ -85,6 +92,22 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="#1E293B" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="ContextMenu">
+                <Setter.Value>
+                    <ContextMenu>
+                        <MenuItem Header="📁 Open in File Explorer" Command="{Binding OpenInExplorerCommand}">
+                            <MenuItem.Icon>
+                                <ui:SymbolIcon Symbol="Folder24" Foreground="#38BDF8" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="📋 Copy Full Path" Command="{Binding CopyPathCommand}">
+                            <MenuItem.Icon>
+                                <ui:SymbolIcon Symbol="Copy24" Foreground="#94A3B8" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#1A334155" />
@@ -94,6 +117,66 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="ViewSwitcherCardButton" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCardView}" Value="True">
+                    <Setter Property="Background" Value="#38BDF8" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#38BDF8" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ViewSwitcherTableButton" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCardView}" Value="False">
+                    <Setter Property="Background" Value="#38BDF8" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#38BDF8" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AgeFilter0Button" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsAgeFilter0}" Value="True">
+                    <Setter Property="Background" Value="#38BDF8" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#38BDF8" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AgeFilter1Button" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsAgeFilter1}" Value="True">
+                    <Setter Property="Background" Value="#38BDF8" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#38BDF8" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AgeFilter2Button" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsAgeFilter2}" Value="True">
+                    <Setter Property="Background" Value="#38BDF8" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#38BDF8" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AgeFilter3Button" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsAgeFilter3}" Value="True">
+                    <Setter Property="Background" Value="#F59E0B" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#F59E0B" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Window.InputBindings>
@@ -101,6 +184,8 @@
         <KeyBinding Key="Esc" Command="{Binding CancelScanCommand}" />
         <KeyBinding Modifiers="Ctrl+Shift" Key="A" Command="{Binding SelectAllCommand}" />
         <KeyBinding Modifiers="Ctrl+Shift" Key="D" Command="{Binding DeselectAllCommand}" />
+        <KeyBinding Modifiers="Ctrl+Shift" Key="I" Command="{Binding InvertSelectionCommand}" />
+        <KeyBinding Modifiers="Ctrl+Shift" Key="E" Command="{Binding ExportResultsCommand}" />
     </Window.InputBindings>
 
     <Window.DataContext>
@@ -278,13 +363,23 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
                         <ui:TextBox Grid.Column="0" Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}"
                                     PlaceholderText="Select or enter developer workspace directory (e.g. C:\repos or D:\repos)..."
                                     VerticalContentAlignment="Center" Margin="0,0,8,0" Height="36" />
 
-                        <ui:Button Grid.Column="1" Command="{Binding BrowsePathCommand}"
+                        <ui:Button Grid.Column="1" Click="OnHistoryButtonClicked"
+                                   Appearance="Secondary" Height="36" Margin="0,0,8,0" ToolTip="Recent workspace history">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="History24" Margin="0,0,6,0" Foreground="#38BDF8" />
+                                <TextBlock Text="History" FontWeight="Medium" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <ui:Button Grid.Column="2" Command="{Binding BrowsePathCommand}"
                                    Appearance="Secondary" Height="36" Margin="0,0,8,0" ToolTip="Browse workspace folder">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="FolderOpen24" Margin="0,0,6,0" />
@@ -292,7 +387,15 @@
                             </StackPanel>
                         </ui:Button>
 
-                        <ui:Button Grid.Column="2" Command="{Binding ScanCommand}"
+                        <ui:Button Grid.Column="3" Command="{Binding OpenRuleManagerCommand}"
+                                   Appearance="Secondary" Height="36" Margin="0,0,8,0" ToolTip="Configure purge rules and target ecosystems">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Settings24" Margin="0,0,6,0" Foreground="#A855F7" />
+                                <TextBlock Text="{Binding ActiveRulesSummary}" FontWeight="Medium" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <ui:Button Grid.Column="4" Command="{Binding ScanCommand}"
                                    Appearance="Primary" Height="36" Padding="18,0">
                             <StackPanel Orientation="Horizontal">
                                 <ui:SymbolIcon Symbol="Search24" Margin="0,0,8,0" />
@@ -301,7 +404,7 @@
                         </ui:Button>
 
                         <!-- Cancel Scan Button (Revealed during active scan) -->
-                        <ui:Button Grid.Column="3" Command="{Binding CancelScanCommand}"
+                        <ui:Button Grid.Column="5" Command="{Binding CancelScanCommand}"
                                    Appearance="Danger" Height="36" Margin="8,0,0,0" Padding="12,0"
                                    Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
                             <StackPanel Orientation="Horizontal">
@@ -346,7 +449,9 @@
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="TOTAL DISCOVERED" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
                                 <TextBlock Text="{Binding FormattedTotalDiscoveredSize}" FontSize="18" FontWeight="Bold" Foreground="#38BDF8" Margin="0,1,0,0" />
-                                <TextBlock Text="{Binding DiscoveredCount, StringFormat='{}{0} disposable folders'}" FontSize="11" Foreground="#94A3B8" />
+                                <TextBlock FontSize="11" Foreground="#94A3B8">
+                                    <Run Text="{Binding DiscoveredCount, Mode=OneWay}" /><Run Text=" folders • " /><Run Text="{Binding TotalDiscoveredFiles, Mode=OneWay, StringFormat='{}{0:N0}'}" /><Run Text=" files" />
+                                </TextBlock>
                             </StackPanel>
                         </Grid>
 
@@ -362,7 +467,9 @@
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="QUEUED FOR PURGE" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
                                 <TextBlock Text="{Binding FormattedSelectedSize}" FontSize="18" FontWeight="Bold" Foreground="#10B981" Margin="0,1,0,0" />
-                                <TextBlock Text="{Binding SelectedCount, StringFormat='{}{0} folders selected'}" FontSize="11" Foreground="#94A3B8" />
+                                <TextBlock FontSize="11" Foreground="#94A3B8">
+                                    <Run Text="{Binding SelectedCount, Mode=OneWay}" /><Run Text=" folders • " /><Run Text="{Binding SelectedFiles, Mode=OneWay, StringFormat='{}{0:N0}'}" /><Run Text=" files" />
+                                </TextBlock>
                             </StackPanel>
                         </Grid>
 
@@ -385,21 +492,19 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- Metric 4: Safety Shield Mode -->
+                        <!-- Metric 4: Estimated Storage Value -->
                         <Grid Grid.Column="3" Margin="5,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Border Grid.Column="0" Background="#2E1A47" Width="36" Height="36" CornerRadius="10" Margin="0,0,10,0" VerticalAlignment="Center">
-                                <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="18" Foreground="#A78BFA" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <ui:SymbolIcon Symbol="Money24" FontSize="18" Foreground="#C084FC" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="SAFETY SHIELD" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
-                                <CheckBox IsChecked="{Binding SendToRecycleBin}" Content="Recycle Bin Safe"
-                                          FontWeight="SemiBold" FontSize="11" Margin="0,2,0,0"
-                                          ToolTip="Deleted folders can be restored from Windows Recycle Bin" />
-                                <TextBlock Text="Zero permanent loss risk" FontSize="10" Foreground="#10B981" Margin="20,0,0,0" />
+                                <TextBlock Text="ESTIMATED VALUE" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
+                                <TextBlock Text="{Binding FormattedEstimatedSavings}" FontSize="18" FontWeight="Bold" Foreground="#C084FC" Margin="0,1,0,0" />
+                                <TextBlock Text="NVMe storage saved" FontSize="11" Foreground="#94A3B8" />
                             </StackPanel>
                         </Grid>
                     </Grid>
@@ -514,13 +619,13 @@
                             <!-- Age Segmented Group -->
                             <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Padding="2" Margin="0,0,10,0">
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Style="{StaticResource PillTabButton}" Content="All Time"
+                                    <Button Style="{StaticResource AgeFilter0Button}" Content="All Time"
                                             Command="{Binding SetMinAgeFilterCommand}" CommandParameter="0" />
-                                    <Button Style="{StaticResource PillTabButton}" Content="> 7d"
+                                    <Button Style="{StaticResource AgeFilter1Button}" Content="> 7d"
                                             Command="{Binding SetMinAgeFilterCommand}" CommandParameter="1" />
-                                    <Button Style="{StaticResource PillTabButton}" Content="> 14d"
+                                    <Button Style="{StaticResource AgeFilter2Button}" Content="> 14d"
                                             Command="{Binding SetMinAgeFilterCommand}" CommandParameter="2" />
-                                    <Button Style="{StaticResource PillTabButton}" Content="> 30d (Stale)"
+                                    <Button Style="{StaticResource AgeFilter3Button}" Content="> 30d (Stale)"
                                             Command="{Binding SetMinAgeFilterCommand}" CommandParameter="3" />
                                 </StackPanel>
                             </Border>
@@ -545,11 +650,53 @@
                                 <TextBlock Text="Deselect" FontSize="11" />
                             </ui:Button>
 
+                            <ui:Button Command="{Binding InvertSelectionCommand}" Appearance="Transparent" Padding="8,4" Margin="0,0,4,0"
+                                       ToolTip="Invert selection across folders (Ctrl+Shift+I)">
+                                <TextBlock Text="Invert" FontSize="11" />
+                            </ui:Button>
+
                             <ui:Button Command="{Binding SelectStaleCommand}" Appearance="Transparent" Padding="8,4"
                                        ToolTip="Quickly select only abandoned folders older than 30 days">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="History24" FontSize="14" Foreground="#F59E0B" Margin="0,0,4,0" />
                                     <TextBlock Text="Select Stale (>30d)" FontSize="11" Foreground="#F59E0B" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </ui:Button>
+
+                            <!-- Vertical Separator -->
+                            <Border Width="1" Height="16" Background="#334155" Margin="6,0,6,0" VerticalAlignment="Center" />
+
+                            <!-- View Mode Switcher -->
+                            <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Padding="2">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Style="{StaticResource ViewSwitcherCardButton}"
+                                            Command="{Binding SetViewModeCommand}" CommandParameter="cards"
+                                            ToolTip="Repository Project Cards View">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Grid24" FontSize="12" Margin="0,0,4,0" />
+                                            <TextBlock Text="Cards" FontSize="11" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource ViewSwitcherTableButton}"
+                                            Command="{Binding SetViewModeCommand}" CommandParameter="table"
+                                            ToolTip="Compact Table View">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Table24" FontSize="12" Margin="0,0,4,0" />
+                                            <TextBlock Text="Table" FontSize="11" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Vertical Separator -->
+                            <Border Width="1" Height="16" Background="#334155" Margin="6,0,6,0" VerticalAlignment="Center" />
+
+                            <!-- Export Results Button -->
+                            <ui:Button Command="{Binding ExportResultsCommand}" Appearance="Transparent" Padding="8,4"
+                                       ToolTip="Export scan results to CSV, JSON, or Markdown (Ctrl+Shift+E)">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="14" Margin="0,0,4,0" Foreground="#38BDF8" />
+                                    <TextBlock Text="Export..." FontSize="11" Foreground="#38BDF8" />
                                 </StackPanel>
                             </ui:Button>
                         </StackPanel>
@@ -563,8 +710,163 @@
                 <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Top"
                              Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
 
-                <!-- Results DataGrid -->
-                <DataGrid ItemsSource="{Binding DisplayedItems}" AutoGenerateColumns="False"
+                <!-- 3A. REPOSITORY CARDS VIEW -->
+                <ScrollViewer Visibility="{Binding IsCardView, Converter={StaticResource BoolToVis}}"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              Focusable="False">
+                    <ItemsControl ItemsSource="{Binding GroupedRepositories}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Vertical" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#A60F172A" BorderBrush="#243044" BorderThickness="1"
+                                        CornerRadius="12" Margin="0,0,0,10" Padding="14,12">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <!-- Card Header -->
+                                            <RowDefinition Height="Auto" />
+                                            <!-- Card Folders Body -->
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header Row -->
+                                        <Grid Grid.Row="0">
+                                            <Grid.ColumnDefinitions>
+                                                <!-- Tech Icon -->
+                                                <ColumnDefinition Width="Auto" />
+                                                <!-- Repo Info -->
+                                                <ColumnDefinition Width="*" />
+                                                <!-- Space & Actions -->
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Tech Badge -->
+                                            <Border Grid.Column="0" Width="38" Height="38" CornerRadius="10"
+                                                    Background="{Binding TechBadgeBackground}"
+                                                    BorderBrush="{Binding TechBadgeBorder}" BorderThickness="1"
+                                                    Margin="0,0,12,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding TechAbbreviation}" FontWeight="Bold" FontSize="13"
+                                                           Foreground="{Binding TechBadgeForeground}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <!-- Repo Name & Path -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding RepositoryName}" FontSize="14" FontWeight="Bold" Foreground="#F8FAFC" />
+                                                    <!-- Primary Ecosystem Chip -->
+                                                    <Border Background="{Binding TechBadgeBackground}" BorderBrush="{Binding TechBadgeBorder}"
+                                                            BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding PrimaryEcosystem}" FontSize="10" FontWeight="SemiBold"
+                                                                   Foreground="{Binding TechBadgeForeground}" />
+                                                    </Border>
+                                                    <!-- Folder count badge -->
+                                                    <TextBlock Text="{Binding FolderCountText}" FontSize="11" Foreground="#64748B" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding RepositoryPath}" FontSize="11" Foreground="#64748B" FontFamily="Consolas, Segoe UI"
+                                                           Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding RepositoryPath}" />
+                                            </StackPanel>
+
+                                            <!-- Right: Total Size, Checkbox, Actions, and Expand Toggle -->
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- Total Size -->
+                                                <TextBlock Text="{Binding FormattedTotalSize}" FontSize="14" FontWeight="Bold" Foreground="#38BDF8"
+                                                           VerticalAlignment="Center" Margin="0,0,16,0" />
+
+                                                <!-- Open in Explorer -->
+                                                <ui:Button Command="{Binding OpenInExplorerCommand}" Appearance="Transparent" Padding="4" Margin="0,0,8,0"
+                                                           ToolTip="Open repository folder in File Explorer">
+                                                    <ui:SymbolIcon Symbol="Folder24" FontSize="14" Foreground="#94A3B8" />
+                                                </ui:Button>
+
+                                                <!-- Repo-level CheckBox -->
+                                                <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,10,0"
+                                                          ToolTip="Select or deselect all disposable folders in this repository" />
+
+                                                <!-- Collapse / Expand Button -->
+                                                <ui:Button Command="{Binding ToggleExpandCommand}" Appearance="Transparent" Padding="4"
+                                                           ToolTip="Toggle expandable folder list">
+                                                    <ui:SymbolIcon Symbol="{Binding ExpandIconSymbol}" FontSize="14" Foreground="#94A3B8" />
+                                                </ui:Button>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Folders List Body (Visible when IsExpanded) -->
+                                        <Border Grid.Row="1" Margin="0,10,0,0" Padding="0,8,0,0"
+                                                BorderBrush="#1E293B" BorderThickness="0,1,0,0"
+                                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                                            <ItemsControl ItemsSource="{Binding Folders}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#400B1120" BorderBrush="#1E293B" BorderThickness="1"
+                                                                CornerRadius="8" Padding="10,6" Margin="0,0,0,6">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <!-- Folder CheckBox -->
+                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                                                          VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                                                                <!-- Folder Monospace Tag & Path -->
+                                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
+                                                                            CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                                        <TextBlock Text="{Binding FolderName}" FontFamily="Consolas, Segoe UI" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" />
+                                                                    </Border>
+                                                                    <!-- Age badge -->
+                                                                    <Border Background="{Binding AgeBadgeBackground}" BorderBrush="{Binding AgeBadgeBorder}"
+                                                                            BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                                        <TextBlock Text="{Binding FormattedAge}" FontSize="10" Foreground="{Binding AgeBadgeForeground}" />
+                                                                    </Border>
+                                                                    <TextBlock Text="{Binding Path}" FontSize="11" Foreground="#64748B" VerticalAlignment="Center"
+                                                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
+                                                                </StackPanel>
+
+                                                                <!-- Mini visual size bar -->
+                                                                <Border Grid.Column="2" Background="#1E293B" Height="4" CornerRadius="2" Width="60"
+                                                                        Margin="0,0,14,0" VerticalAlignment="Center">
+                                                                    <Border Background="#38BDF8" Height="4" CornerRadius="2" HorizontalAlignment="Left"
+                                                                            Width="{Binding RelativeSizeWidth}" />
+                                                                </Border>
+
+                                                                <!-- Folder Size -->
+                                                                <TextBlock Grid.Column="3" Text="{Binding FormattedSize}" FontWeight="Bold" FontSize="12"
+                                                                           Foreground="{Binding SizeForeground}" VerticalAlignment="Center" Margin="0,0,14,0" MinWidth="70" TextAlignment="Right" />
+
+                                                                <!-- Quick Actions -->
+                                                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <ui:Button Command="{Binding OpenInExplorerCommand}" Appearance="Transparent" Padding="4" Margin="0,0,4,0" ToolTip="Open in File Explorer">
+                                                                        <ui:SymbolIcon Symbol="Folder24" FontSize="13" Foreground="#94A3B8" />
+                                                                    </ui:Button>
+                                                                    <ui:Button Command="{Binding CopyPathCommand}" Appearance="Transparent" Padding="4" ToolTip="Copy path to clipboard">
+                                                                        <ui:SymbolIcon Symbol="Copy24" FontSize="13" Foreground="#94A3B8" />
+                                                                    </ui:Button>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- 3B. COMPACT TABLE VIEW -->
+                <DataGrid Visibility="{Binding IsTableView, Converter={StaticResource BoolToVis}}"
+                          ItemsSource="{Binding DisplayedItems}" AutoGenerateColumns="False"
                           CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal" RowHeight="42"
                           EnableRowVirtualization="True"

@@ -42,29 +42,29 @@ public record PurgeRule(
             "Gradle / Java Build",
             ArtifactType.GradleBuild,
             "Java / Android",
-            ["build", ".gradle"],
+            ["build", ".gradle", ".kotlin"],
             "Gradle build outputs, wrapper caches, and intermediate classes"
         ),
         new(
             "Python Virtual Envs & Cache",
             ArtifactType.PythonVenv,
             "Python",
-            [".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", "htmlcov"],
-            "Python virtual environments, bytecode cache, and test coverage"
+            [".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", "htmlcov", ".nox", ".hypothesis", ".uv_cache", ".uv", ".pixi", "__pypackages__"],
+            "Python virtual environments, bytecode cache, uv/pixi/pdm caches, and test coverage"
         ),
         new(
             "Frontend Framework Caches",
             ArtifactType.CacheAndTemp,
             "Web Frameworks",
-            [".next", ".nuxt", ".turbo", ".cache", ".svelte-kit", "dist", ".angular", ".astro", ".parcel-cache"],
-            "Bundler and SSR framework cache folders"
+            [".next", ".nuxt", ".turbo", ".cache", ".svelte-kit", "dist", ".angular", ".astro", ".parcel-cache", ".vite", ".nx", ".docusaurus", ".rollup.cache", ".swc", ".rspack-cache", ".nyc_output"],
+            "Bundler, build tools, SSR framework, and test coverage cache folders"
         ),
         new(
             "Vendor Directories",
             ArtifactType.Vendor,
             "Composer / Go",
-            ["vendor"],
-            "Third-party packages (PHP Composer, Go vendor)"
+            ["vendor", ".gocache"],
+            "Third-party packages (PHP Composer, Go vendor) and Go compiler build cache"
         ),
         new(
             "Visual Studio Cache",
@@ -77,8 +77,8 @@ public record PurgeRule(
             "IDE & Editor Caches",
             ArtifactType.IdeCache,
             "IDE Caches",
-            [".idea"],
-            "JetBrains IntelliJ, Rider, WebStorm workspace indexes and caches"
+            [".idea", ".fleet", ".bloop", ".metals"],
+            "JetBrains IntelliJ, Rider, WebStorm, Fleet, Bloop, and Metals workspace indexes and caches"
         ),
         new(
             "Dart & Flutter Build",
@@ -91,8 +91,8 @@ public record PurgeRule(
             "C++ & CMake Build",
             ArtifactType.CppBuild,
             "C++ / CMake",
-            ["cmake-build-debug", "cmake-build-release", ".cxx"],
-            "CMake and C++ compiler intermediate build outputs"
+            ["cmake-build-debug", "cmake-build-release", "cmake-build-relwithdebinfo", "cmake-build-minsizerel", ".cxx"],
+            "CMake and C++ compiler intermediate build outputs across all profiles"
         ),
         new(
             "Zig Build Output",
@@ -105,8 +105,8 @@ public record PurgeRule(
             "Swift & Xcode Build",
             ArtifactType.SwiftBuild,
             "Swift / Apple",
-            ["DerivedData"],
-            "Xcode intermediate build files, module caches, and index data"
+            ["DerivedData", ".build"],
+            "Xcode intermediate build files, SPM build directories, module caches, and index data"
         ),
         new(
             "Elixir Build Output",

@@ -22,15 +22,21 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 
 ## ✨ Features
 
-- ⚡ **Ultra-Fast Parallel Scanner**: Uses fast directory traversal optimized to prune trees upon finding artifact boundaries, completing full workspace scans in seconds.
-- 🛡️ **Safety Rails**:
-  - **Never** touches `.git` repositories or parent directories.
-  - **Protected System Blacklist**: Strict exclusions for `C:\Windows`, `Program Files`, and OS directories.
-  - **Manifest Heuristic**: Aborts deletion if a folder contains project files (`package.json`, `Cargo.toml`, `.sln`).
-- 🗑️ **Recycle Bin or Permanent Deletion**: Safe deletion moves folders to the Windows Recycle Bin for easy undo.
-- ⏳ **Age Filtering**: Target only abandoned projects (e.g. untouched for `> 7 days`, `> 14 days`, or `> 30 days`).
-- 🎨 **Modern Windows 11 Fluent UI**: Clean dark theme, responsive grid, real-time reclaimable counters, and one-click explorer links.
-- 💻 **Headless CLI**: Automate cleanups or inspect folders straight from your terminal.
+- ⚡ **Ultra-Fast Parallel Scanner**: Uses high-performance single-pass filesystem enumeration with instant tree pruning upon finding artifact boundaries, completing full multi-workspace scans in seconds.
+- 🛡️ **Hardened Safety & Resilience Rails**:
+  - **Symlink & Junction Immunity**: Refuses to delete directory junctions, symbolic links, or reparse points, preventing external target loss.
+  - **WSL & Virtual Mount Protection**: Protects WSL distro roots (`\\wsl$\Ubuntu`) and Linux system trees (`/bin`, `/etc`, `/usr`) while allowing user repos (`/home/user/...`).
+  - **Cloud Sync Guard**: Protects OneDrive, Dropbox, and Google Drive sync roots and offline placeholder files from accidental deletion loops.
+  - **Never** touches `.git` repositories, submodules, or worktrees.
+  - **Protected System Blacklist**: Strict exclusions for `C:\Windows`, `Program Files`, `PerfLogs`, and Unix root structures (`/lib`, `/lib64`, `/opt`, `/root`, `/Volumes`).
+  - **Manifest Safeguard**: Protects source code by aborting deletion if a directory contains project manifests (`package.json`, `Cargo.toml`, `.sln`, `.slnx`, `Dockerfile`, `go.mod`, `go.work`, `deno.lock`, `uv.lock`, `pdm.lock`, `pnpm-lock.yaml`, `requirements.txt`, `tsconfig.json`).
+- 🔍 **Verified Dry-Run Simulation**: Inspects directory accessibility and active process file locks non-destructively before any purge.
+- 📋 **Persistent Audit Logging**: Thread-safe audit records (`audit.jsonl`) tracking every purge action, user, timestamp, reclaimed bytes, and errors.
+- 🗑️ **Recycle Bin or Permanent Deletion**: Safe deletion moves folders to the Windows Recycle Bin by default with automatic retry mechanisms for locked files.
+- ⏳ **Granular Filtering**: Filter by age (`> 14 days`), size threshold (`--min-size 100MB`), ecosystem (`--type node`), or largest space-hoggers (`--top 10`).
+- 📂 **Multi-Workspace Scanning**: Scan multiple developer repositories simultaneously by separating paths with `,` or `;`.
+- 🎨 **Modern Windows 11 Fluent UI**: Clean dark theme, responsive grid, real-time folder & file counters, selection inversion (`Ctrl+Shift+I`), CSV/JSON/Markdown export (`Ctrl+Shift+E`), and File Explorer integration.
+- 💻 **Headless CLI**: Streamlined for automation, cron jobs, and CI/CD pipelines with `NO_COLOR` and JSON output support.
 - 🔒 **Privacy First**: 100% offline, zero telemetry, zero tracking.
 
 ---
@@ -39,17 +45,17 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 
 | Ecosystem | Target Directories |
 | :--- | :--- |
-| **JavaScript / TypeScript** | `node_modules`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.svelte-kit`, `dist`, `.angular`, `.astro`, `.parcel-cache` |
+| **JavaScript / TypeScript / Frameworks** | `node_modules`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.svelte-kit`, `dist`, `.angular`, `.astro`, `.parcel-cache`, `.vite`, `.nx`, `.docusaurus`, `.rollup.cache`, `.swc`, `.rspack-cache`, `.nyc_output` |
 | **.NET / C#** | `bin`, `obj`, `TestResults`, `BenchmarkDotNet.Artifacts` |
 | **Rust / Cargo** | `target` |
-| **Java / Android / Gradle** | `build`, `.gradle` |
-| **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.tox`, `htmlcov` |
-| **PHP / Go** | `vendor` |
-| **Visual Studio / IDE Caches** | `.vs`, `.idea` |
+| **Java / Kotlin / Android / Gradle** | `build`, `.gradle`, `.kotlin` |
+| **Python** | `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.tox`, `htmlcov`, `.nox`, `.hypothesis`, `.uv_cache`, `.uv`, `.pixi`, `__pypackages__` |
+| **PHP / Go** | `vendor`, `.gocache` |
+| **Visual Studio / IDE Caches** | `.vs`, `.idea`, `.fleet`, `.bloop`, `.metals` |
 | **Dart / Flutter** | `.dart_tool` |
-| **C++ / CMake** | `cmake-build-debug`, `cmake-build-release`, `.cxx` |
+| **C++ / CMake** | `cmake-build-debug`, `cmake-build-release`, `cmake-build-relwithdebinfo`, `cmake-build-minsizerel`, `.cxx` |
 | **Zig** | `zig-cache`, `zig-out` |
-| **Swift / Apple** | `DerivedData` |
+| **Swift / Apple** | `DerivedData`, `.build` |
 | **Elixir** | `_build` |
 
 ## 📦 Downloads (v1.1.0)
@@ -71,10 +77,12 @@ Pre-built, **100% self-contained** standalone packages (zero runtime dependencie
 ## 🖥️ Graphical Interface (WPF)
 
 Launch `DevPurge.App`:
-1. Pick your dev workspace folder (e.g. `C:\repos` or `D:\repos`).
-2. Click **Scan Workspace**.
-3. Inspect discovered folders, filter by age, and select folders to reclaim.
-4. Click **Purge Selected** to free gigabytes immediately.
+1. Pick one or more dev workspace folders (e.g. `C:\repos; D:\work`) or pick from your **History** dropdown.
+2. Customize ecosystems or add custom folder patterns via **Rules...** manager.
+3. Click **Scan Workspace**.
+4. Inspect discovered folders, filter by ecosystem/age, toggle Project Cards or Table view, or invert selection (`Ctrl+Shift+I`).
+5. Export reports to CSV or JSON with **Export...** (`Ctrl+Shift+E`).
+6. Click **Purge Selected** to free gigabytes safely and immediately.
 
 <p align="center">
   <img src="assets/milestone_celebration.png?v=2" alt="DevPurge Milestone Dialog" width="460" />
@@ -87,14 +95,23 @@ Launch `DevPurge.App`:
 DevPurge includes a standalone CLI tool for power users:
 
 ```powershell
-# Safe Dry-Run (preview how much space can be reclaimed)
-DevPurge.Cli --path C:\repos
+# Safe Dry-Run (preview how much space can be reclaimed across multiple paths)
+DevPurge.Cli --path C:\repos,D:\repos
 
 # Purge folders untouched for more than 14 days
 DevPurge.Cli --path C:\repos --clean --min-age 14
 
-# Clean only specific ecosystem artifacts (e.g. node_modules)
+# Reclaim only heavy caches larger than 500MB
+DevPurge.Cli --path C:\repos --clean --min-size 500MB
+
+# Purge only top 10 largest build artifact directories
+DevPurge.Cli --path C:\repos --clean --top 10
+
+# Clean only specific ecosystem artifacts (e.g. node, dotnet, rust, python)
 DevPurge.Cli --path C:\repos --clean --type node
+
+# Automated, non-interactive execution (skips prompt)
+DevPurge.Cli --path C:\repos --clean --yes
 
 # Exclude specific repositories or folders from scanning
 DevPurge.Cli --path C:\repos --clean --exclude "legacy-app,temp-work"
@@ -102,11 +119,20 @@ DevPurge.Cli --path C:\repos --clean --exclude "legacy-app,temp-work"
 # Permanent deletion (bypasses Windows Recycle Bin)
 DevPurge.Cli --path C:\repos --clean --permanent
 
-# Output structured JSON (ideal for CI/CD or automation scripts)
+# Verify file locks and purge eligibility non-destructively
+DevPurge.Cli --path C:\repos --verify
+
+# View recent purge audit history
+DevPurge.Cli --history
+
+# Export scan report to CSV, JSON, or Markdown table
+DevPurge.Cli --path C:\repos --export report.md
+
+# Output structured JSON with dry-run verification
 DevPurge.Cli --path C:\repos,D:\repos --json
 
-# Silent execution (suitable for background cron/scheduled tasks)
-DevPurge.Cli --path C:\repos --clean --min-age 30 --silent
+# Silent execution with custom audit log destination
+DevPurge.Cli --path C:\repos --clean --min-age 30 --silent --audit-log C:\logs\purge.jsonl
 ```
 
 ---

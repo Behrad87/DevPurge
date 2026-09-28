@@ -168,10 +168,11 @@ public class FastDirectoryScanner
             var dir = stack.Pop();
             string dirName = Path.GetFileName(dir);
 
-            // Skip version control internal directories
+            // Skip version control internal directories and blacklisted system folders
             if (string.Equals(dirName, ".git", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(dirName, ".svn", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(dirName, ".hg", StringComparison.OrdinalIgnoreCase))
+                string.Equals(dirName, ".hg", StringComparison.OrdinalIgnoreCase) ||
+                SafetyValidator.IsSystemBlacklisted(dirName))
             {
                 continue;
             }
@@ -228,7 +229,8 @@ public class FastDirectoryScanner
                     if (!string.Equals(name, ".git", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(name, ".svn", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(name, ".hg", StringComparison.OrdinalIgnoreCase) &&
-                        (exclusionSet == null || !exclusionSet.Contains(name)))
+                        !SafetyValidator.IsSystemBlacklisted(name) &&
+                        (exclusionSet == null || (!exclusionSet.Contains(name) && !exclusionSet.Contains(sub))))
                     {
                         stack.Push(sub);
                     }
@@ -252,6 +254,7 @@ public class FastDirectoryScanner
     /// <summary>
     /// Computes recursive size, file count, and latest modified timestamp for an artifact folder.
     /// Skips reparse points (symlinks/junctions) to prevent counting external or circular directories.
+    /// Uses single-pass filesystem enumeration for maximum throughput.
     /// </summary>
     public static (long TotalBytes, int FileCount, DateTime LastModifiedUtc) CalculateDirectoryStats(
         string directoryPath,
@@ -264,6 +267,11 @@ public class FastDirectoryScanner
         try
         {
             var dirInfo = new DirectoryInfo(directoryPath);
+            if (dirInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                return (0, 0, DateTime.UtcNow);
+            }
+
             latestModified = dirInfo.LastWriteTimeUtc;
 
             var queue = new Queue<DirectoryInfo>();
@@ -276,22 +284,24 @@ public class FastDirectoryScanner
 
                 try
                 {
-                    foreach (var file in di.EnumerateFiles("*", SafeTraversalOptions))
+                    foreach (var entry in di.EnumerateFileSystemInfos("*", SafeTraversalOptions))
                     {
-                        totalBytes += file.Length;
-                        fileCount++;
-                        if (file.LastWriteTimeUtc > latestModified)
+                        if (entry is FileInfo file)
                         {
-                            latestModified = file.LastWriteTimeUtc;
+                            totalBytes += file.Length;
+                            fileCount++;
+                            if (file.LastWriteTimeUtc > latestModified)
+                            {
+                                latestModified = file.LastWriteTimeUtc;
+                            }
                         }
-                    }
-
-                    foreach (var sub in di.EnumerateDirectories("*", SafeTraversalOptions))
-                    {
-                        queue.Enqueue(sub);
-                        if (sub.LastWriteTimeUtc > latestModified)
+                        else if (entry is DirectoryInfo sub)
                         {
-                            latestModified = sub.LastWriteTimeUtc;
+                            queue.Enqueue(sub);
+                            if (sub.LastWriteTimeUtc > latestModified)
+                            {
+                                latestModified = sub.LastWriteTimeUtc;
+                            }
                         }
                     }
                 }

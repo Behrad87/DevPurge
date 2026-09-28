@@ -16,6 +16,7 @@ public class DiscoveredFolder
     public string? ErrorMessage { get; set; }
 
     public double AgeDays => Math.Max(0, (DateTime.UtcNow - LastModifiedUtc).TotalDays);
+    public bool IsStale => AgeDays >= 30;
 
     public string FormattedAge
     {

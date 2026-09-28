@@ -4,6 +4,10 @@ using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DevPurge.App.Views;
+using DevPurge.Core.Auditing;
+using DevPurge.Core.Configuration;
+using DevPurge.Core.Exporting;
 using DevPurge.Core.Models;
 using DevPurge.Core.Purging;
 using DevPurge.Core.Scanning;
@@ -12,11 +16,21 @@ namespace DevPurge.App.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    private readonly FastDirectoryScanner _scanner = new();
-    private readonly PurgeService _purgeService = new();
+    private readonly UserSettingsManager _settingsManager = new();
+    private readonly AuditLogger _auditLogger = new();
+    private FastDirectoryScanner _scanner;
+    private PurgeService _purgeService;
     private readonly List<FolderItemViewModel> _allItems = [];
     private CancellationTokenSource? _scanCts;
     private CancellationTokenSource? _searchCts;
+
+    public ObservableCollection<string> RecentPaths { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActiveRulesSummary))]
+    private int _activeRulesCount;
+
+    public string ActiveRulesSummary => $"Rules ({ActiveRulesCount})";
 
     [ObservableProperty]
     private string _targetPath = @"C:\repos";
@@ -61,6 +75,9 @@ public partial class MainViewModel : ObservableObject
     private int _discoveredCount;
 
     [ObservableProperty]
+    private int _totalDiscoveredFiles;
+
+    [ObservableProperty]
     private long _selectedBytes;
 
     [ObservableProperty]
@@ -68,6 +85,9 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private int _selectedCount;
+
+    [ObservableProperty]
+    private int _selectedFiles;
 
     [ObservableProperty]
     private long _staleBytes;
@@ -87,9 +107,31 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _currentScanningPath = string.Empty;
 
+    [ObservableProperty]
+    private bool _isCardView = true;
+
+    [ObservableProperty]
+    private string _formattedEstimatedSavings = "~$0.00";
+
+    public bool IsTableView => !IsCardView;
+
+    partial void OnIsCardViewChanged(bool value)
+    {
+        _settingsManager.Settings.IsCardView = value;
+        _settingsManager.Save();
+        OnPropertyChanged(nameof(IsTableView));
+    }
+
+    partial void OnSendToRecycleBinChanged(bool value)
+    {
+        _settingsManager.Settings.SendToRecycleBin = value;
+        _settingsManager.Save();
+    }
+
     public bool HasNoItemsAndNotScanning => !IsScanning && !HasResults;
 
     public ObservableCollection<FolderItemViewModel> DisplayedItems { get; } = [];
+    public ObservableCollection<RepositoryGroupViewModel> GroupedRepositories { get; } = [];
     public ObservableCollection<CategoryFilterItem> CategoryFilters { get; } = [];
 
     [ObservableProperty]
@@ -101,7 +143,26 @@ public partial class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
-        if (Directory.Exists(@"C:\repos"))
+        var effectiveRules = _settingsManager.GetEffectiveRules();
+        _scanner = new FastDirectoryScanner(effectiveRules);
+        _purgeService = new PurgeService(effectiveRules);
+        _activeRulesCount = effectiveRules.Count(r => r.IsEnabled);
+
+        _sendToRecycleBin = _settingsManager.Settings.SendToRecycleBin;
+        _minAgeFilterIndex = _settingsManager.Settings.MinAgeFilterIndex;
+        _isCardView = _settingsManager.Settings.IsCardView;
+
+        foreach (var p in _settingsManager.Settings.RecentPaths)
+        {
+            RecentPaths.Add(p);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_settingsManager.Settings.LastSelectedPath) &&
+            Directory.Exists(_settingsManager.Settings.LastSelectedPath))
+        {
+            _targetPath = _settingsManager.Settings.LastSelectedPath;
+        }
+        else if (Directory.Exists(@"C:\repos"))
         {
             _targetPath = @"C:\repos";
         }
@@ -138,6 +199,8 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnMinAgeFilterIndexChanged(int value)
     {
+        _settingsManager.Settings.MinAgeFilterIndex = value;
+        _settingsManager.Save();
         OnPropertyChanged(nameof(IsAgeFilter0));
         OnPropertyChanged(nameof(IsAgeFilter1));
         OnPropertyChanged(nameof(IsAgeFilter2));
@@ -170,11 +233,13 @@ public partial class MainViewModel : ObservableObject
         var selected = DisplayedItems.Where(i => i.IsSelected).ToList();
         SelectedCount = selected.Count;
         SelectedBytes = selected.Sum(i => i.SizeBytes);
+        SelectedFiles = selected.Sum(i => i.FileCount);
         FormattedSelectedSize = DiscoveredFolder.FormatByteSize(SelectedBytes);
         HasSelectedItems = SelectedCount > 0;
 
         DiscoveredCount = _allItems.Count;
         TotalDiscoveredBytes = _allItems.Sum(i => i.SizeBytes);
+        TotalDiscoveredFiles = _allItems.Sum(i => i.FileCount);
         FormattedTotalDiscoveredSize = DiscoveredFolder.FormatByteSize(TotalDiscoveredBytes);
 
         var stale = _allItems.Where(i => i.IsStale).ToList();
@@ -191,7 +256,16 @@ public partial class MainViewModel : ObservableObject
             ? $"{topGroup.Key} ({DiscoveredFolder.FormatByteSize(topGroup.Sum(x => x.SizeBytes))})"
             : "None";
 
-        SummaryText = $"{FormattedSelectedSize} selected ({SelectedCount} of {DisplayedItems.Count} folders)";
+        SummaryText = $"{FormattedSelectedSize} selected ({SelectedCount} of {DisplayedItems.Count} folders • {SelectedFiles:N0} files)";
+
+        double gigabytes = TotalDiscoveredBytes / (1024.0 * 1024.0 * 1024.0);
+        FormattedEstimatedSavings = gigabytes >= 0.5 ? $"~${Math.Max(1.0, gigabytes * 0.15):F1}" : "< $1";
+
+        foreach (var group in GroupedRepositories)
+        {
+            group.NotifyChildSelectionChanged();
+        }
+
         PurgeCommand.NotifyCanExecuteChanged();
     }
 
@@ -305,10 +379,25 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {
-        if (string.IsNullOrWhiteSpace(TargetPath) || !Directory.Exists(TargetPath))
+        var rawPaths = TargetPath.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var validPaths = rawPaths.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        if (validPaths.Count == 0)
         {
             MessageBox.Show($"Target directory does not exist:\n{TargetPath}", "Invalid Path", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
+        }
+
+        foreach (var path in validPaths)
+        {
+            _settingsManager.AddRecentPath(path);
+        }
+        _settingsManager.Save();
+
+        RecentPaths.Clear();
+        foreach (var p in _settingsManager.Settings.RecentPaths)
+        {
+            RecentPaths.Add(p);
         }
 
         _scanCts?.Cancel();
@@ -318,7 +407,9 @@ public partial class MainViewModel : ObservableObject
         IsScanning = true;
         HasResults = false;
         CurrentScanningPath = TargetPath;
-        StatusText = $"Scanning '{TargetPath}' for disposable build artifacts...";
+        StatusText = validPaths.Count == 1
+            ? $"Scanning '{validPaths[0]}' for disposable build artifacts..."
+            : $"Scanning {validPaths.Count} workspaces for disposable build artifacts...";
         _allItems.Clear();
         DisplayedItems.Clear();
         CategoryFilters.Clear();
@@ -335,7 +426,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            var results = await _scanner.ScanAsync([TargetPath], progress, cancellationToken);
+            var results = await _scanner.ScanAsync(validPaths, progress, cancellationToken);
 
             foreach (var r in results)
             {
@@ -410,7 +501,9 @@ public partial class MainViewModel : ObservableObject
             var report = await _purgeService.PurgeAsync(
                 selected.Select(s => s.Model),
                 sendToRecycleBin: SendToRecycleBin,
-                progress: progress
+                progress: progress,
+                cancellationToken: default,
+                auditLogger: _auditLogger
             );
 
             // Fast in-memory removal
@@ -477,6 +570,16 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void InvertSelection()
+    {
+        foreach (var item in DisplayedItems)
+        {
+            item.IsSelected = !item.IsSelected;
+        }
+        UpdateSummary();
+    }
+
+    [RelayCommand]
     private void SelectStale()
     {
         foreach (var item in DisplayedItems)
@@ -484,6 +587,83 @@ public partial class MainViewModel : ObservableObject
             item.IsSelected = item.IsStale;
         }
         UpdateSummary();
+    }
+
+    [RelayCommand]
+    private async Task ExportResults()
+    {
+        if (DisplayedItems.Count == 0)
+        {
+            MessageBox.Show("No discovered items to export. Run a scan first.", "Export", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export Discovered Folders Report",
+            Filter = "CSV File (*.csv)|*.csv|JSON File (*.json)|*.json|Markdown File (*.md)|*.md",
+            FileName = $"DevPurge_Report_{DateTime.Now:yyyyMMdd_HHmmss}",
+            DefaultExt = ".csv"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                var metadata = new ExportReportMetadata(TargetPath, DateTime.UtcNow, "1.1.0");
+                var models = DisplayedItems.Select(item => item.Model);
+                await ScanReportExporter.ExportToFileAsync(dialog.FileName, models, metadata);
+                MessageBox.Show($"Exported {DisplayedItems.Count} items successfully to:\n{dialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to export file:\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void OpenRuleManager()
+    {
+        var vm = new RuleManagerViewModel(_settingsManager);
+        var dlg = new RuleManagerDialog(vm)
+        {
+            Owner = Application.Current?.MainWindow
+        };
+
+        dlg.ShowDialog();
+
+        // Reload scanner and purge engine with updated effective rules
+        var effectiveRules = _settingsManager.GetEffectiveRules();
+        _scanner = new FastDirectoryScanner(effectiveRules);
+        _purgeService = new PurgeService(effectiveRules);
+        ActiveRulesCount = effectiveRules.Count(r => r.IsEnabled);
+    }
+
+    [RelayCommand]
+    private void SelectRecentPath(string? path)
+    {
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            TargetPath = path;
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveRecentPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        _settingsManager.RemoveRecentPath(path);
+        _settingsManager.Save();
+        RecentPaths.Remove(path);
+    }
+
+    [RelayCommand]
+    private void ClearRecentPaths()
+    {
+        _settingsManager.ClearRecentPaths();
+        _settingsManager.Save();
+        RecentPaths.Clear();
     }
 
     [RelayCommand]
@@ -528,6 +708,44 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void OpenReymit() => OpenUrl("https://reymit.ir/behrad87");
 
+    [RelayCommand]
+    private void SetViewMode(string mode)
+    {
+        IsCardView = mode.Equals("cards", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetRepositoryRoot(string folderPath, string targetRoot)
+    {
+        try
+        {
+            var roots = targetRoot.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(Path.GetFullPath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var current = System.IO.Path.GetDirectoryName(folderPath);
+            string fallback = current ?? folderPath;
+
+            while (!string.IsNullOrEmpty(current) && !roots.Contains(current))
+            {
+                if (Directory.Exists(System.IO.Path.Combine(current, ".git")))
+                {
+                    return current;
+                }
+                var parent = System.IO.Path.GetDirectoryName(current);
+                if (parent != null && roots.Contains(parent))
+                {
+                    return current;
+                }
+                current = parent;
+            }
+            return fallback;
+        }
+        catch
+        {
+            return System.IO.Path.GetDirectoryName(folderPath) ?? folderPath;
+        }
+    }
+
     private void ApplyFilter()
     {
         int minDays = MinAgeFilterIndex switch
@@ -567,6 +785,22 @@ public partial class MainViewModel : ObservableObject
         {
             DisplayedItems.Add(item);
         }
+
+        GroupedRepositories.Clear();
+        var repoGroups = list
+            .GroupBy(item => GetRepositoryRoot(item.Path, TargetPath))
+            .OrderByDescending(g => g.Sum(x => x.SizeBytes));
+
+        foreach (var group in repoGroups)
+        {
+            var repoPath = group.Key;
+            var repoName = System.IO.Path.GetFileName(repoPath);
+            if (string.IsNullOrEmpty(repoName)) repoName = repoPath;
+
+            var groupVm = new RepositoryGroupViewModel(repoName, repoPath, group, UpdateSummary);
+            GroupedRepositories.Add(groupVm);
+        }
+
         UpdateSummary();
     }
 
