@@ -18,5 +18,8 @@ public enum ArtifactType
     CppBuild,
     ZigBuild,
     SwiftBuild,
-    ElixirBuild
+    ElixirBuild,
+    RubyBundle,
+    HaskellBuild,
+    TerraformCache
 }

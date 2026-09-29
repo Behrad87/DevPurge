@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
+using System.IO.Enumeration;
 using DevPurge.Core.Models;
 
 namespace DevPurge.Core.Scanning;
@@ -14,7 +15,7 @@ public record ScanProgress(
 /// <summary>
 /// High-speed asynchronous directory scanner targeting developer build and dependency artifacts.
 /// </summary>
-public class FastDirectoryScanner
+public class FastDirectoryScanner : IFastDirectoryScanner
 {
     private static readonly EnumerationOptions SafeTraversalOptions = new()
     {
@@ -254,7 +255,7 @@ public class FastDirectoryScanner
     /// <summary>
     /// Computes recursive size, file count, and latest modified timestamp for an artifact folder.
     /// Skips reparse points (symlinks/junctions) to prevent counting external or circular directories.
-    /// Uses single-pass filesystem enumeration for maximum throughput.
+    /// Uses single-pass filesystem enumeration with zero-allocation file entry reading for maximum throughput.
     /// </summary>
     public static (long TotalBytes, int FileCount, DateTime LastModifiedUtc) CalculateDirectoryStats(
         string directoryPath,
@@ -266,6 +267,11 @@ public class FastDirectoryScanner
 
         try
         {
+            if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
+            {
+                return (0, 0, DateTime.UtcNow);
+            }
+
             var dirInfo = new DirectoryInfo(directoryPath);
             if (dirInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
             {
@@ -274,33 +280,51 @@ public class FastDirectoryScanner
 
             latestModified = dirInfo.LastWriteTimeUtc;
 
-            var queue = new Queue<DirectoryInfo>();
-            queue.Enqueue(dirInfo);
+            var queue = new Queue<string>();
+            queue.Enqueue(directoryPath);
 
             while (queue.Count > 0)
             {
                 if (cancellationToken.IsCancellationRequested) break;
-                var di = queue.Dequeue();
+                var currentDir = queue.Dequeue();
 
                 try
                 {
-                    foreach (var entry in di.EnumerateFileSystemInfos("*", SafeTraversalOptions))
-                    {
-                        if (entry is FileInfo file)
+                    var enumerable = new FileSystemEnumerable<(long Length, DateTime LastModifiedUtc, bool IsDirectory, string? SubDir)>(
+                        currentDir,
+                        (ref FileSystemEntry entry) =>
                         {
-                            totalBytes += file.Length;
-                            fileCount++;
-                            if (file.LastWriteTimeUtc > latestModified)
+                            if (entry.IsDirectory)
                             {
-                                latestModified = file.LastWriteTimeUtc;
+                                return (0, entry.LastWriteTimeUtc.UtcDateTime, true, entry.ToSpecifiedFullPath());
+                            }
+                            else
+                            {
+                                return (entry.Length, entry.LastWriteTimeUtc.UtcDateTime, false, null);
+                            }
+                        },
+                        SafeTraversalOptions);
+
+                    foreach (var item in enumerable)
+                    {
+                        if (item.IsDirectory)
+                        {
+                            if (item.SubDir != null)
+                            {
+                                queue.Enqueue(item.SubDir);
+                            }
+                            if (item.LastModifiedUtc > latestModified)
+                            {
+                                latestModified = item.LastModifiedUtc;
                             }
                         }
-                        else if (entry is DirectoryInfo sub)
+                        else
                         {
-                            queue.Enqueue(sub);
-                            if (sub.LastWriteTimeUtc > latestModified)
+                            totalBytes += item.Length;
+                            fileCount++;
+                            if (item.LastModifiedUtc > latestModified)
                             {
-                                latestModified = sub.LastWriteTimeUtc;
+                                latestModified = item.LastModifiedUtc;
                             }
                         }
                     }

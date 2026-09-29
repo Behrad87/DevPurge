@@ -16,15 +16,35 @@ namespace DevPurge.App.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    private readonly UserSettingsManager _settingsManager = new();
-    private readonly AuditLogger _auditLogger = new();
-    private FastDirectoryScanner _scanner;
-    private PurgeService _purgeService;
+    private readonly IUserSettingsManager _settingsManager;
+    private readonly IAuditLogger _auditLogger;
+    private IFastDirectoryScanner _scanner;
+    private IPurgeService _purgeService;
     private readonly List<FolderItemViewModel> _allItems = [];
     private CancellationTokenSource? _scanCts;
     private CancellationTokenSource? _searchCts;
 
     public ObservableCollection<string> RecentPaths { get; } = [];
+
+    public TreeSizeViewModel TreeSize { get; }
+
+    [ObservableProperty]
+    private int _activeTabIndex = 0; // 0 = Cleaner, 1 = TreeSize
+
+    public bool IsCleanerTab => ActiveTabIndex == 0;
+    public bool IsTreeSizeTab => ActiveTabIndex == 1;
+
+    partial void OnActiveTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsCleanerTab));
+        OnPropertyChanged(nameof(IsTreeSizeTab));
+    }
+
+    [RelayCommand]
+    private void SwitchTab(string tab)
+    {
+        ActiveTabIndex = tab.Equals("treesize", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ActiveRulesSummary))]
@@ -141,11 +161,22 @@ public partial class MainViewModel : ObservableObject
     private bool CanCancelScan => IsScanning;
     private bool CanPurge => !IsScanning && !IsPurging && HasSelectedItems;
 
-    public MainViewModel()
+    public MainViewModel() : this(null, null, null, null)
     {
+    }
+
+    public MainViewModel(
+        IUserSettingsManager? settingsManager = null,
+        IAuditLogger? auditLogger = null,
+        IFastDirectoryScanner? scanner = null,
+        IPurgeService? purgeService = null)
+    {
+        _settingsManager = settingsManager ?? new UserSettingsManager();
+        _auditLogger = auditLogger ?? new AuditLogger();
+        TreeSize = new TreeSizeViewModel(_settingsManager, _auditLogger);
         var effectiveRules = _settingsManager.GetEffectiveRules();
-        _scanner = new FastDirectoryScanner(effectiveRules);
-        _purgeService = new PurgeService(effectiveRules);
+        _scanner = scanner ?? new FastDirectoryScanner(effectiveRules);
+        _purgeService = purgeService ?? new PurgeService(effectiveRules);
         _activeRulesCount = effectiveRules.Count(r => r.IsEnabled);
 
         _sendToRecycleBin = _settingsManager.Settings.SendToRecycleBin;

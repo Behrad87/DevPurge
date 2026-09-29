@@ -6,7 +6,7 @@ namespace DevPurge.Core.Configuration;
 /// <summary>
 /// Manages loading, saving, and querying persistent user configuration and workspace path history.
 /// </summary>
-public class UserSettingsManager
+public class UserSettingsManager : IUserSettingsManager
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

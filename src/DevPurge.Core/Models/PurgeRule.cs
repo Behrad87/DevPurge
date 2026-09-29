@@ -114,6 +114,27 @@ public record PurgeRule(
             "Elixir",
             ["_build"],
             "Mix build outputs and compiled beam bytecode"
+        ),
+        new(
+            "Ruby Bundler Dependencies",
+            ArtifactType.RubyBundle,
+            "Ruby / Bundler",
+            [".bundle"],
+            "Installed Ruby gem bundle configuration and local path bundles"
+        ),
+        new(
+            "Haskell Build Artifacts",
+            ArtifactType.HaskellBuild,
+            "Haskell",
+            ["dist-newstyle", ".stack-work"],
+            "Cabal and Stack compiled Haskell build products and package caches"
+        ),
+        new(
+            "Terraform & OpenTofu Cache",
+            ArtifactType.TerraformCache,
+            "Terraform / OpenTofu",
+            [".terraform"],
+            "Terraform provider plugins, modules, and local state caches"
         )
     ];
 

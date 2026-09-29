@@ -196,4 +196,16 @@ public class FastDirectoryScannerTests : IDisposable
         Assert.Equal(0, totalBytes);
         Assert.Equal(0, fileCount);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void CalculateDirectoryStats_NullOrWhitespace_ReturnsZero(string? path)
+    {
+        var (totalBytes, fileCount, _) = FastDirectoryScanner.CalculateDirectoryStats(path!);
+
+        Assert.Equal(0, totalBytes);
+        Assert.Equal(0, fileCount);
+    }
 }

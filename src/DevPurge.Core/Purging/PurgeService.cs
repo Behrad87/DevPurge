@@ -12,7 +12,7 @@ namespace DevPurge.Core.Purging;
 /// High-speed safe deletion service for target artifact directories.
 /// Supports high-throughput batch Recycle Bin operations and parallel permanent purging.
 /// </summary>
-public class PurgeService
+public class PurgeService(IEnumerable<PurgeRule>? rules = null) : IPurgeService
 {
     #region Win32 Shell API for Recycle Bin
 
@@ -69,15 +69,9 @@ public class PurgeService
 
     #endregion
 
-    private readonly FrozenSet<string> _allowedFolderNames;
-
-    public PurgeService(IEnumerable<PurgeRule>? rules = null)
-    {
-        var activeRules = rules ?? PurgeRule.GetDefaultRules();
-        _allowedFolderNames = activeRules
-            .SelectMany(r => r.FolderNames)
-            .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
-    }
+    private readonly FrozenSet<string> _allowedFolderNames = (rules ?? PurgeRule.GetDefaultRules())
+        .SelectMany(r => r.FolderNames)
+        .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Purges target folders using parallel deletion and batched shell operations for maximum throughput.
@@ -87,7 +81,7 @@ public class PurgeService
         bool sendToRecycleBin = true,
         IProgress<(string Path, int Completed, int Total)>? progress = null,
         CancellationToken cancellationToken = default,
-        AuditLogger? auditLogger = null,
+        IAuditLogger? auditLogger = null,
         string? customAuditLogPath = null)
     {
         var list = folders.ToList();

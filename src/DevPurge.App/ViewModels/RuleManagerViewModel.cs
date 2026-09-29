@@ -12,7 +12,7 @@ namespace DevPurge.App.ViewModels;
 /// </summary>
 public partial class RuleManagerViewModel : ObservableObject
 {
-    private readonly UserSettingsManager _settingsManager;
+    private readonly IUserSettingsManager _settingsManager;
 
     public ObservableCollection<RuleItemViewModel> Rules { get; } = [];
 
@@ -40,7 +40,7 @@ public partial class RuleManagerViewModel : ObservableObject
     public int ActiveRulesCount => Rules.Count(r => r.IsEnabled);
     public int TotalRulesCount => Rules.Count;
 
-    public RuleManagerViewModel(UserSettingsManager settingsManager)
+    public RuleManagerViewModel(IUserSettingsManager settingsManager)
     {
         _settingsManager = settingsManager;
         LoadRules();

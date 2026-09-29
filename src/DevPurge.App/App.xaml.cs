@@ -4,7 +4,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DevPurge.App.ViewModels;
 using DevPurge.App.Views;
+using DevPurge.Core.DependencyInjection;
 using DevPurge.Core.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DevPurge.App;
 
@@ -13,9 +15,19 @@ namespace DevPurge.App;
 /// </summary>
 public partial class App : Application
 {
+    public static IServiceProvider Services { get; private set; } = null!;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        var services = new ServiceCollection();
+        services.AddDevPurgeCore();
+        services.AddSingleton<MainViewModel>();
+        services.AddSingleton(sp => new MainWindow(sp.GetRequiredService<MainViewModel>()));
+        services.AddTransient<RuleManagerViewModel>();
+        services.AddTransient<TreeSizeViewModel>();
+        Services = services.BuildServiceProvider();
 
         if (e.Args.Contains("--screenshot"))
         {
@@ -31,7 +43,7 @@ public partial class App : Application
             return;
         }
 
-        var mainWindow = new MainWindow();
+        var mainWindow = Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
     }
 

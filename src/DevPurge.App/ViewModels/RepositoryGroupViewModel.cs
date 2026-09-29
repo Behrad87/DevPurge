@@ -101,6 +101,9 @@ public partial class RepositoryGroupViewModel : ObservableObject
             ArtifactType.ZigBuild => ("ZG", "Flash24", "#33180C", "#EA580C", "#FB923C"),
             ArtifactType.SwiftBuild => ("SW", "Code24", "#331608", "#F97316", "#FB923C"),
             ArtifactType.ElixirBuild => ("EX", "Beaker24", "#240E4A", "#9333EA", "#C084FC"),
+            ArtifactType.RubyBundle => ("RB", "Diamond24", "#3D111A", "#F43F5E", "#FB7185"),
+            ArtifactType.HaskellBuild => ("HS", "Code24", "#231138", "#A855F7", "#C084FC"),
+            ArtifactType.TerraformCache => ("TF", "Cloud24", "#201736", "#8B5CF6", "#A78BFA"),
             _ => ("DEV", "Folder24", "#1E293B", "#334155", "#94A3B8")
         };
     }

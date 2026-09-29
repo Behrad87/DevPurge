@@ -1,6 +1,8 @@
+using System.Collections.Frozen;
 using System.Reflection;
 using System.Text.Json;
 using DevPurge.Core.Auditing;
+using DevPurge.Core.Configuration;
 using DevPurge.Core.Models;
 using DevPurge.Core.Purging;
 using DevPurge.Core.Scanning;
@@ -29,11 +31,46 @@ public record CliOptions
     public bool VerifyDryRun { get; init; }
     public string? ExportPath { get; init; }
     public bool NoConfig { get; init; }
+    public string? SortBy { get; init; } = "size";
+    public bool Interactive { get; init; }
+    public bool TreeSize { get; init; }
+    public int TreeDepth { get; init; } = 4;
 }
 
 public class Program
 {
     private static readonly object ConsoleLock = new();
+
+    private static readonly FrozenSet<string> KnownValueFlags = new[]
+    {
+        "path", "p",
+        "min-age", "minage", "age", "m", "a",
+        "min-size", "minsize", "size", "z",
+        "top", "limit",
+        "type", "t", "category",
+        "exclude", "x", "ignore",
+        "audit-log", "auditlog",
+        "export", "output", "out", "e",
+        "sort", "sort-by", "orderby",
+        "depth", "tree-depth", "max-depth"
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly FrozenSet<string> BooleanFlags = new[]
+    {
+        "clean", "c",
+        "dry-run", "dryrun", "d",
+        "yes", "y",
+        "permanent",
+        "silent", "s",
+        "json", "j",
+        "help", "h", "?",
+        "version", "v",
+        "no-audit", "noaudit",
+        "audit", "audit-history", "audithistory", "history",
+        "verify", "verify-dry-run",
+        "no-config", "noconfig",
+        "interactive", "i"
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     public static string Version =>
         Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.1.0";
@@ -59,7 +96,47 @@ public class Program
             return await PrintAuditHistoryAsync(options);
         }
 
-        return await RunScanOrPurgeAsync(options);
+        using var cts = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancelHandler = (_, e) =>
+        {
+            e.Cancel = true;
+            cts.Cancel();
+        };
+
+        try
+        {
+            Console.CancelKeyPress += cancelHandler;
+        }
+        catch
+        {
+            // Ignore if console input cannot be hooked in certain test/redirected environments
+        }
+
+        if (options.TreeSize)
+        {
+            return await RunTreeSizeAsync(options, cts.Token);
+        }
+
+        try
+        {
+            return await RunScanOrPurgeAsync(options, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!options.Silent && !options.Json)
+            {
+                Console.WriteLine("\nOperation cancelled by user.");
+            }
+            return 130;
+        }
+        finally
+        {
+            try
+            {
+                Console.CancelKeyPress -= cancelHandler;
+            }
+            catch { }
+        }
     }
 
     private static bool SupportsColor =>
@@ -112,6 +189,8 @@ public class Program
         Console.WriteLine("  -t, --type <name>    Filter by ecosystem or artifact type (e.g. node, dotnet, rust, python)");
         Console.WriteLine("  -x, --exclude <dir>  Exclude specific folders or pattern from scanning/purging");
         Console.WriteLine("  --top <count>        Limit to top N largest discovered folders");
+        Console.WriteLine("  --sort <field>       Sort discovered folders by: size (default), age, name, path, files");
+        Console.WriteLine("  -i, --interactive    Interactively select/toggle folders to purge");
         Console.WriteLine("  -y, --yes            Automatic non-interactive confirmation");
         Console.WriteLine("  --verify             Simulate purge and verify file locks / safety without deleting");
         Console.WriteLine("  --audit-log <path>   Custom path for audit log records (default: %LOCALAPPDATA%/DevPurge/logs)");
@@ -119,6 +198,8 @@ public class Program
         Console.WriteLine("  --audit, --history   Display recent purge audit records");
         Console.WriteLine("  --export <file>      Export scan report to CSV, JSON, or Markdown file");
         Console.WriteLine("  --no-config          Ignore user custom rules and use built-in defaults");
+        Console.WriteLine("  --treesize, --tree   Analyze hierarchical disk space usage of directory tree");
+        Console.WriteLine("  --depth <N>          Maximum tree depth for TreeSize analysis (default: 4)");
         Console.WriteLine("  -j, --json           Output scan results or deletion report as JSON");
         Console.WriteLine("  -s, --silent         Quiet output (no banners, only errors or JSON)");
         Console.WriteLine("  -v, --version        Show version information");
@@ -126,6 +207,7 @@ public class Program
         Console.WriteLine();
         Console.WriteLine("EXAMPLES:");
         Console.WriteLine("  DevPurge.Cli D:\\repos");
+        Console.WriteLine("  DevPurge.Cli D:\\repos --treesize --depth 3");
         Console.WriteLine("  DevPurge.Cli -p D:\\repos -c -m 14");
         Console.WriteLine("  DevPurge.Cli -p D:\\repos -c -z 100MB");
         Console.WriteLine("  DevPurge.Cli -p D:\\repos -c -t node");
@@ -139,7 +221,13 @@ public class Program
         ResetColor();
     }
 
-    private static async Task<int> RunScanOrPurgeAsync(CliOptions options)
+    public static async Task<int> RunScanOrPurgeAsync(
+        CliOptions options,
+        CancellationToken cancellationToken = default,
+        IUserSettingsManager? settingsManager = null,
+        IFastDirectoryScanner? scanner = null,
+        IPurgeService? purgeService = null,
+        IAuditLogger? auditLogger = null)
     {
         bool silent = options.Silent || options.Json;
         bool isClean = options.Clean && !options.DryRun;
@@ -178,9 +266,14 @@ public class Program
             Console.WriteLine("Scanning in progress...");
         }
 
-        var settingsManager = new DevPurge.Core.Configuration.UserSettingsManager();
+        settingsManager ??= new DevPurge.Core.Configuration.UserSettingsManager();
         var effectiveRules = options.NoConfig ? PurgeRule.GetDefaultRules() : settingsManager.GetEffectiveRules();
-        var scanner = new FastDirectoryScanner(effectiveRules);
+        scanner ??= new FastDirectoryScanner(effectiveRules);
+        purgeService ??= new PurgeService(effectiveRules);
+        if (!options.NoAudit && auditLogger == null)
+        {
+            auditLogger = new AuditLogger(options.AuditLogPath);
+        }
         var progress = (silent || Console.IsOutputRedirected) ? null : new Progress<ScanProgress>(p =>
         {
             if (!p.IsCompleted && !string.IsNullOrEmpty(p.CurrentPath))
@@ -201,7 +294,7 @@ public class Program
             }
         });
 
-        var results = await scanner.ScanAsync(paths, progress, cancellationToken: default, exclusions: options.Exclusions);
+        var results = await scanner.ScanAsync(paths, progress, cancellationToken: cancellationToken, exclusions: options.Exclusions);
 
         if (!silent && !Console.IsOutputRedirected)
         {
@@ -237,6 +330,15 @@ public class Program
                                               r.FolderName.Equals(ex, StringComparison.OrdinalIgnoreCase))
             ).ToList();
         }
+
+        results = (options.SortBy?.ToLowerInvariant()) switch
+        {
+            "age" => results.OrderByDescending(r => r.AgeDays).ToList(),
+            "name" => results.OrderBy(r => r.FolderName, StringComparer.OrdinalIgnoreCase).ToList(),
+            "path" => results.OrderBy(r => r.Path, StringComparer.OrdinalIgnoreCase).ToList(),
+            "files" => results.OrderByDescending(r => r.FileCount).ToList(),
+            _ => results.OrderByDescending(r => r.SizeBytes).ToList()
+        };
 
         if (options.TopCount > 0 && results.Count > options.TopCount)
         {
@@ -280,8 +382,6 @@ public class Program
             Console.WriteLine(new string('-', 60));
         }
 
-        var purgeService = new PurgeService(effectiveRules);
-
         if (results.Count == 0)
         {
             if (options.Json)
@@ -318,13 +418,12 @@ public class Program
 
         if (!isClean)
         {
-            var dryRunReport = await purgeService.SimulatePurgeAsync(results);
+            var dryRunReport = await purgeService.SimulatePurgeAsync(results, cancellationToken);
 
-            if (options.VerifyDryRun && !options.NoAudit)
+            if (options.VerifyDryRun && auditLogger != null)
             {
                 try
                 {
-                    var auditLogger = new AuditLogger(options.AuditLogPath);
                     await auditLogger.LogDryRunAsync(dryRunReport, paths, options.AuditLogPath);
                 }
                 catch { }
@@ -430,6 +529,52 @@ public class Program
             return 0;
         }
 
+        // Interactive Selection before Purging
+        if (options.Interactive && !silent && !Console.IsInputRedirected && results.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Interactive folder selection (enter numbers to toggle, or press Enter to proceed):");
+            var selectedMask = Enumerable.Repeat(true, results.Count).ToArray();
+            while (true)
+            {
+                for (int i = 0; i < results.Count; i++)
+                {
+                    var mark = selectedMask[i] ? "[X]" : "[ ]";
+                    Console.WriteLine($" {i + 1,2}. {mark} {results[i].FolderName,-16} {results[i].FormattedSize,-10} {results[i].Path}");
+                }
+                Console.Write("Toggle numbers (e.g. 1,3), 'a' for all, 'n' for none, or Enter to proceed: ");
+                var line = Console.ReadLine()?.Trim();
+                if (string.IsNullOrEmpty(line)) break;
+                if (line.Equals("a", StringComparison.OrdinalIgnoreCase))
+                {
+                    Array.Fill(selectedMask, true);
+                }
+                else if (line.Equals("n", StringComparison.OrdinalIgnoreCase))
+                {
+                    Array.Fill(selectedMask, false);
+                }
+                else
+                {
+                    var tokens = line.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var tok in tokens)
+                    {
+                        if (int.TryParse(tok, out int num) && num >= 1 && num <= results.Count)
+                        {
+                            selectedMask[num - 1] = !selectedMask[num - 1];
+                        }
+                    }
+                }
+            }
+            results = results.Where((r, i) => selectedMask[i]).ToList();
+            totalBytes = results.Sum(r => r.SizeBytes);
+            totalFiles = results.Sum(r => r.FileCount);
+            if (results.Count == 0)
+            {
+                Console.WriteLine("No folders selected for purge.");
+                return 0;
+            }
+        }
+
         // Interactive Confirmation before Purging
         if (!options.Yes && !silent && !Console.IsInputRedirected)
         {
@@ -476,7 +621,7 @@ public class Program
             results,
             sendToRecycleBin: !permanent,
             purgeProgress,
-            cancellationToken: default,
+            cancellationToken: cancellationToken,
             auditLogger: purgeAuditLogger,
             customAuditLogPath: options.AuditLogPath
         );
@@ -512,7 +657,7 @@ public class Program
             Console.WriteLine($"[Purge Complete] Reclaimed: {report.FormattedReclaimedSize} | Successfully removed: {report.SuccessfulCount}/{report.TotalRequested}");
             ResetColor();
 
-            if (purgeAuditLogger != null)
+            if (auditLogger != null)
             {
                 Console.WriteLine($"Audit log recorded: {options.AuditLogPath ?? AuditLogger.GetDefaultLogPath()}");
             }
@@ -558,6 +703,213 @@ public class Program
         }
 
         return report.FailedCount == 0 ? 0 : 2;
+    }
+
+    public static async Task<int> RunTreeSizeAsync(
+        CliOptions options,
+        CancellationToken cancellationToken = default,
+        DevPurge.Core.TreeSize.ITreeSizeScanner? treeScanner = null)
+    {
+        bool silent = options.Silent || options.Json;
+        if (!silent)
+        {
+            PrintBanner();
+        }
+
+        var paths = ResolveTargetPaths(options.Paths);
+        if (paths.Count == 0)
+        {
+            if (options.Json)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(new { error = "No valid target directories to analyze with TreeSize." }, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            else if (!silent)
+            {
+                SetColor(ConsoleColor.Red);
+                Console.WriteLine("No valid target directories to analyze. Specify a folder to scan.");
+                ResetColor();
+            }
+            return 1;
+        }
+
+        treeScanner ??= new DevPurge.Core.TreeSize.TreeSizeScanner();
+
+        foreach (var rootPath in paths)
+        {
+            if (!silent)
+            {
+                Console.WriteLine($"Analyzing TreeSize disk space for: {rootPath} (Max Depth: {options.TreeDepth})...");
+            }
+
+            var progress = (silent || Console.IsOutputRedirected) ? null : new Progress<DevPurge.Core.TreeSize.TreeSizeProgress>(p =>
+            {
+                if (!p.IsCompleted && !string.IsNullOrEmpty(p.CurrentPath))
+                {
+                    lock (ConsoleLock)
+                    {
+                        try
+                        {
+                            var msg = $"Scanned: {p.DirectoriesScanned:N0} folders, {p.FilesScanned:N0} files ({DiscoveredFolder.FormatByteSize(p.TotalBytesScanned)})";
+                            int width = Console.WindowWidth > 1 ? Console.WindowWidth - 1 : 70;
+                            Console.Write($"\r{msg.PadRight(width)}");
+                        }
+                        catch { }
+                    }
+                }
+            });
+
+            var rootNode = await treeScanner.ScanTreeAsync(
+                rootPath,
+                maxDepth: options.TreeDepth,
+                progress: progress,
+                cancellationToken: cancellationToken,
+                exclusions: options.Exclusions);
+
+            if (rootNode == null)
+            {
+                if (!silent)
+                {
+                    SetColor(ConsoleColor.Red);
+                    Console.WriteLine($"Could not scan: {rootPath}");
+                    ResetColor();
+                }
+                continue;
+            }
+
+            if (!silent && !Console.IsOutputRedirected)
+            {
+                lock (ConsoleLock)
+                {
+                    Console.WriteLine();
+                }
+            }
+
+            if (options.Json)
+            {
+                Console.WriteLine(DevPurge.Core.TreeSize.TreeSizeExporter.ToJson(rootNode));
+            }
+            else
+            {
+                Console.WriteLine();
+                SetColor(ConsoleColor.Cyan);
+                Console.WriteLine($"[TreeSize Analysis] {rootNode.Name} — {rootNode.FormattedSize} total ({rootNode.DirectoryCount:N0} folders, {rootNode.FileCount:N0} files)");
+                ResetColor();
+                Console.WriteLine(new string('-', 76));
+
+                PrintTreeConsole(rootNode, "", 1, options.TreeDepth);
+
+                Console.WriteLine(new string('-', 76));
+
+                long artifactBytes = 0;
+                int artifactCount = 0;
+                CountTreeArtifacts(rootNode, ref artifactBytes, ref artifactCount);
+
+                if (artifactCount > 0)
+                {
+                    SetColor(ConsoleColor.Green);
+                    Console.WriteLine($"💡 Found {artifactCount} disposable developer cache folders totaling {DiscoveredFolder.FormatByteSize(artifactBytes)} reclaimable space.");
+                    Console.WriteLine($"   Run `devpurge -p \"{rootPath}\" -c` to batch-purge them safely.");
+                    ResetColor();
+                }
+                else
+                {
+                    Console.WriteLine("No recognized disposable developer build caches detected in this tree.");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.ExportPath))
+            {
+                try
+                {
+                    string content = Path.GetExtension(options.ExportPath).ToLowerInvariant() switch
+                    {
+                        ".json" => DevPurge.Core.TreeSize.TreeSizeExporter.ToJson(rootNode),
+                        ".txt" => DevPurge.Core.TreeSize.TreeSizeExporter.ToTextTree(rootNode, options.TreeDepth),
+                        _ => DevPurge.Core.TreeSize.TreeSizeExporter.ToCsv(rootNode)
+                    };
+
+                    await File.WriteAllTextAsync(options.ExportPath, content, cancellationToken);
+                    if (!silent)
+                    {
+                        Console.WriteLine($"TreeSize report exported to: {options.ExportPath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (!silent)
+                    {
+                        SetColor(ConsoleColor.Red);
+                        Console.WriteLine($"Failed to export TreeSize report: {ex.Message}");
+                        ResetColor();
+                    }
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private static void CountTreeArtifacts(DevPurge.Core.TreeSize.TreeSizeNode node, ref long bytes, ref int count)
+    {
+        if (node.IsArtifact)
+        {
+            bytes += node.SizeBytes;
+            count++;
+        }
+        foreach (var child in node.Children)
+        {
+            CountTreeArtifacts(child, ref bytes, ref count);
+        }
+    }
+
+    private static void PrintTreeConsole(DevPurge.Core.TreeSize.TreeSizeNode parent, string indent, int currentDepth, int maxDepth)
+    {
+        if (currentDepth > maxDepth) return;
+
+        for (int i = 0; i < parent.Children.Count; i++)
+        {
+            var child = parent.Children[i];
+            bool isLast = (i == parent.Children.Count - 1);
+            var branch = isLast ? "└── " : "├── ";
+            var nextIndent = indent + (isLast ? "    " : "│   ");
+
+            Console.Write($"{indent}{branch}");
+
+            if (child.IsArtifact)
+            {
+                SetColor(ConsoleColor.Green);
+                Console.Write($"{child.Name} ");
+                SetColor(ConsoleColor.DarkGreen);
+                Console.Write($"[{child.ArtifactCategory ?? "Artifact"}] ");
+            }
+            else if (child.SizeBytes >= 1024L * 1024 * 1024)
+            {
+                SetColor(ConsoleColor.Yellow);
+                Console.Write($"{child.Name} ");
+            }
+            else
+            {
+                SetColor(ConsoleColor.White);
+                Console.Write($"{child.Name} ");
+            }
+            ResetColor();
+
+            var bar = FormatTreeBar(child.PercentOfParent, 8);
+            SetColor(ConsoleColor.Cyan);
+            Console.Write($"{child.FormattedSize,9} ");
+            SetColor(ConsoleColor.DarkGray);
+            Console.Write($"{bar} {child.FormattedPercent,6} ");
+            Console.WriteLine($"({child.FileCount:N0} files)");
+            ResetColor();
+
+            PrintTreeConsole(child, nextIndent, currentDepth + 1, maxDepth);
+        }
+    }
+
+    private static string FormatTreeBar(double percent, int width = 8)
+    {
+        int filled = (int)Math.Round((Math.Clamp(percent, 0, 100) / 100.0) * width);
+        return $"[{new string('█', filled)}{new string('░', width - filled)}]";
     }
 
     public static List<string> ResolveTargetPaths(List<string> configuredPaths)
@@ -629,18 +981,6 @@ public class Program
         }
 
         // Collect positional arguments (any non-flag args not consumed by flags)
-        var knownValueFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "path", "p",
-            "min-age", "minage", "age", "m", "a",
-            "min-size", "minsize", "size", "z",
-            "top", "limit",
-            "type", "t", "category",
-            "exclude", "x", "ignore",
-            "audit-log", "auditlog",
-            "export", "output", "out", "e"
-        };
-
         for (int i = 0; i < args.Length; i++)
         {
             var arg = args[i];
@@ -651,7 +991,7 @@ public class Program
                 {
                     continue;
                 }
-                if (knownValueFlags.Contains(cleanName) && i + 1 < args.Length)
+                if (KnownValueFlags.Contains(cleanName) && i + 1 < args.Length)
                 {
                     i++; // Skip the value of the flag
                 }
@@ -751,6 +1091,27 @@ public class Program
 
         bool noConfig = rawDict.ContainsKey("no-config") || rawDict.ContainsKey("noconfig");
 
+        string? sortBy = "size";
+        if (rawDict.TryGetValue("sort", out var sortVal) ||
+            rawDict.TryGetValue("sort-by", out sortVal) ||
+            rawDict.TryGetValue("orderby", out sortVal))
+        {
+            sortBy = sortVal;
+        }
+
+        bool interactive = rawDict.ContainsKey("interactive") || rawDict.ContainsKey("i");
+        bool treeSize = rawDict.ContainsKey("treesize") || rawDict.ContainsKey("tree");
+        int treeDepth = 4;
+        if (rawDict.TryGetValue("depth", out var depthStr) ||
+            rawDict.TryGetValue("tree-depth", out depthStr) ||
+            rawDict.TryGetValue("max-depth", out depthStr))
+        {
+            if (int.TryParse(depthStr, out var d) && d > 0)
+            {
+                treeDepth = d;
+            }
+        }
+
         return new CliOptions
         {
             Paths = paths,
@@ -772,7 +1133,11 @@ public class Program
             ShowAuditHistory = showAuditHistory,
             VerifyDryRun = verifyDryRun,
             ExportPath = exportPath,
-            NoConfig = noConfig
+            NoConfig = noConfig,
+            SortBy = sortBy,
+            Interactive = interactive,
+            TreeSize = treeSize,
+            TreeDepth = treeDepth
         };
     }
 
@@ -832,21 +1197,6 @@ public class Program
     public static Dictionary<string, string> ParseArguments(string[] args)
     {
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var booleanFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "clean", "c",
-            "dry-run", "dryrun", "d",
-            "yes", "y",
-            "permanent",
-            "silent", "s",
-            "json", "j",
-            "help", "h", "?",
-            "version", "v",
-            "no-audit", "noaudit",
-            "audit", "audit-history", "audithistory", "history",
-            "verify", "verify-dry-run",
-            "no-config", "noconfig"
-        };
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -859,7 +1209,7 @@ public class Program
                     var parts = key.Split('=', 2);
                     dict[parts[0]] = parts[1];
                 }
-                else if (booleanFlags.Contains(key))
+                else if (BooleanFlags.Contains(key))
                 {
                     dict[key] = "true";
                 }
@@ -880,7 +1230,7 @@ public class Program
                     var parts = key.Split('=', 2);
                     dict[parts[0]] = parts[1];
                 }
-                else if (booleanFlags.Contains(key))
+                else if (BooleanFlags.Contains(key))
                 {
                     dict[key] = "true";
                 }

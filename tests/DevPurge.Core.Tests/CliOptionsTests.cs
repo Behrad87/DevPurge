@@ -331,6 +331,72 @@ public class CliOptionsTests
         Assert.NotEmpty(resolved);
         Assert.All(resolved, p => Assert.True(Directory.Exists(p)));
     }
+
+    [Theory]
+    [InlineData("--sort", "age", "age")]
+    [InlineData("--sort-by", "name", "name")]
+    [InlineData("--orderby", "files", "files")]
+    [InlineData("--sort", "path", "path")]
+    [InlineData("--sort", "size", "size")]
+    public void ParseCommandLine_ParsesSortFlags(string flag, string value, string expected)
+    {
+        var options = Program.ParseCommandLine([flag, value]);
+        Assert.Equal(expected, options.SortBy);
+    }
+
+    [Theory]
+    [InlineData("-i")]
+    [InlineData("--interactive")]
+    public void ParseCommandLine_ParsesInteractiveFlags(string flag)
+    {
+        var options = Program.ParseCommandLine([flag]);
+        Assert.True(options.Interactive);
+    }
+
+    [Theory]
+    [InlineData("--treesize")]
+    [InlineData("--tree")]
+    public void ParseCommandLine_ParsesTreeSizeFlag(string flag)
+    {
+        var options = Program.ParseCommandLine([flag]);
+        Assert.True(options.TreeSize);
+    }
+
+    [Theory]
+    [InlineData("--depth", "4", 4)]
+    [InlineData("--tree-depth", "2", 2)]
+    public void ParseCommandLine_ParsesTreeDepth(string flag, string value, int expected)
+    {
+        var options = Program.ParseCommandLine([flag, value]);
+        Assert.Equal(expected, options.TreeDepth);
+    }
+
+    [Fact]
+    public void ParseCommandLine_SupportsDepthEqualsSyntax()
+    {
+        var options = Program.ParseCommandLine(["--depth=5"]);
+        Assert.Equal(5, options.TreeDepth);
+    }
+
+    [Fact]
+    public async Task RunScanOrPurgeAsync_WhenCancelled_ThrowsOperationCanceledException()
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "devpurge_cancel_test_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temp);
+        try
+        {
+            var options = new CliOptions { Paths = [temp], Silent = true };
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                Program.RunScanOrPurgeAsync(options, cts.Token));
+        }
+        finally
+        {
+            if (Directory.Exists(temp)) Directory.Delete(temp, recursive: true);
+        }
+    }
 }
 
 

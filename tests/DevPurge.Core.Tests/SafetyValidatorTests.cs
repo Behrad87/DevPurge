@@ -371,6 +371,11 @@ public class SafetyValidatorTests
     [InlineData("NUL", false)]
     [InlineData("users", false)]
     [InlineData(".nextcloud", false)]
+    [InlineData(".ssh", false)]
+    [InlineData(".gnupg", false)]
+    [InlineData(".aws", false)]
+    [InlineData(".azure", false)]
+    [InlineData(".kube", false)]
     public void ValidateCustomRuleFolder_ValidatesCorrectly(string folderName, bool expectedValid)
     {
         var (isValid, error) = SafetyValidator.ValidateCustomRuleFolder(folderName);
@@ -448,6 +453,10 @@ public class SafetyValidatorTests
     [InlineData("pipfile.lock")]
     [InlineData("tsconfig.json")]
     [InlineData("nuget.config")]
+    [InlineData("directory.packages.props")]
+    [InlineData(".env")]
+    [InlineData(".env.local")]
+    [InlineData(".env.production")]
     public void DirectoryWithExtendedManifests_IsRejected(string manifestName)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "devpurge_test_ext_man_" + Guid.NewGuid().ToString("N"), "bin");
@@ -485,5 +494,33 @@ public class SafetyValidatorTests
                 Directory.Delete(tempDir);
             }
         }
+    }
+
+    [Theory]
+    [InlineData(@"D:\repos\MyProject\.ssh")]
+    [InlineData(@"C:\Users\dev\.gnupg")]
+    [InlineData(@"D:\repos\MyProject\.aws")]
+    [InlineData(@"C:\Users\dev\.azure")]
+    [InlineData(@"/home/dev/.kube")]
+    public void CannotDeleteSecurityOrCredentialsDirectories(string securityDir)
+    {
+        var (isSafe, reason) = SafetyValidator.ValidateSafeToDelete(securityDir, AllowedFolderNames);
+        Assert.False(isSafe);
+        Assert.NotNull(reason);
+        Assert.Contains("developer credentials or security directory", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(".ssh")]
+    [InlineData(".gnupg")]
+    [InlineData(".aws")]
+    [InlineData(".azure")]
+    [InlineData(".kube")]
+    public void ValidateCustomRuleFolder_RejectsCredentialsDirectories(string name)
+    {
+        var (isSafe, reason) = SafetyValidator.ValidateCustomRuleFolder(name);
+        Assert.False(isSafe);
+        Assert.NotNull(reason);
+        Assert.Contains("developer credentials or security directory", reason, StringComparison.OrdinalIgnoreCase);
     }
 }
