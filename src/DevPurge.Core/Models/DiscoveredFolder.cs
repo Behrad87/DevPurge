@@ -18,33 +18,33 @@ public class DiscoveredFolder
     public double AgeDays => Math.Max(0, (DateTime.UtcNow - LastModifiedUtc).TotalDays);
     public bool IsStale => AgeDays >= 30;
 
-    public string FormattedAge
+    private static readonly string[] Suffixes = ["B", "KB", "MB", "GB", "TB"];
+
+    public string FormattedAge => (int)Math.Floor(AgeDays) switch
     {
-        get
+        0 => "Today",
+        1 => "1 day ago",
+        < 30 => $"{(int)Math.Floor(AgeDays)} days ago",
+        var days => (days / 30) switch
         {
-            var days = (int)Math.Floor(AgeDays);
-            if (days == 0) return "Today";
-            if (days == 1) return "1 day ago";
-            if (days < 30) return $"{days} days ago";
-            var months = days / 30;
-            return months == 1 ? "1 month ago" : $"{months} months ago";
+            1 => "1 month ago",
+            var months => $"{months} months ago"
         }
-    }
+    };
 
     public string FormattedSize => FormatByteSize(SizeBytes);
 
     public static string FormatByteSize(long bytes)
     {
         if (bytes < 0) return "0 B";
-        string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
         int counter = 0;
         decimal number = bytes;
-        while (Math.Round(number / 1024) >= 1 && counter < suffixes.Length - 1)
+        while (Math.Round(number / 1024) >= 1 && counter < Suffixes.Length - 1)
         {
             number /= 1024;
             counter++;
         }
-        return $"{number:n2} {suffixes[counter]}";
+        return $"{number:n2} {Suffixes[counter]}";
     }
 
     public override string ToString() => $"{FolderName} ({FormattedSize}) - {Path}";

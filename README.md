@@ -23,6 +23,7 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 ## ✨ Features
 
 - ⚡ **Ultra-Fast Parallel Scanner**: Uses high-performance single-pass filesystem enumeration with instant tree pruning upon finding artifact boundaries, completing full multi-workspace scans in seconds.
+- 🌳 **TreeSize Disk Analyzer**: Full-featured hierarchical disk space analyzer. Rapidly scans and visualizes entire directory trees with proportional visual bars, percentage breakdowns, file/folder counts, developer artifact tagging, and direct safe folder purging.
 - 🛡️ **Hardened Safety & Resilience Rails**:
   - **Symlink & Junction Immunity**: Refuses to delete directory junctions, symbolic links, or reparse points, preventing external target loss.
   - **WSL & Virtual Mount Protection**: Protects WSL distro roots (`\\wsl$\Ubuntu`) and Linux system trees (`/bin`, `/etc`, `/usr`) while allowing user repos (`/home/user/...`).
@@ -57,6 +58,9 @@ Developers frequently run out of SSD space due to dozens of forgotten repositori
 | **Zig** | `zig-cache`, `zig-out` |
 | **Swift / Apple** | `DerivedData`, `.build` |
 | **Elixir** | `_build` |
+| **Ruby / Bundler** | `.bundle` |
+| **Haskell** | `dist-newstyle`, `.stack-work` |
+| **Terraform / OpenTofu** | `.terraform` |
 
 ## 📦 Downloads (v1.1.0)
 
@@ -77,12 +81,24 @@ Pre-built, **100% self-contained** standalone packages (zero runtime dependencie
 ## 🖥️ Graphical Interface (WPF)
 
 Launch `DevPurge.App`:
+- **Workspace Navigation**: Switch seamlessly between **Artifact Cleaner** and the **TreeSize Analyzer** using the top navigation switcher.
+
+### 🧹 Artifact Cleaner Tab
 1. Pick one or more dev workspace folders (e.g. `C:\repos; D:\work`) or pick from your **History** dropdown.
 2. Customize ecosystems or add custom folder patterns via **Rules...** manager.
 3. Click **Scan Workspace**.
 4. Inspect discovered folders, filter by ecosystem/age, toggle Project Cards or Table view, or invert selection (`Ctrl+Shift+I`).
 5. Export reports to CSV or JSON with **Export...** (`Ctrl+Shift+E`).
 6. Click **Purge Selected** to free gigabytes safely and immediately.
+
+### 🌳 TreeSize Disk Analyzer Tab
+1. Select any folder or drive path and click **Analyze Disk Hierarchy**.
+2. Live KPI cards report **Total Directory Size**, **Total Folders**, **Total Files**, and the **Top Space Hogger**.
+3. Explore the interactive tree with proportional percentage bars, file/folder metrics, and detected artifact tags (`node_modules`, `bin/obj`, `.venv`, etc.).
+4. Real-time search filter instantly narrows the hierarchy to matching directory names.
+5. Use **Expand All** or **Collapse All** for fast navigation.
+6. Right-click or action buttons provide **Open in File Explorer**, **Copy Path**, and **Safe Purge to Recycle Bin** with confirmation.
+7. Export tree hierarchy reports to **CSV**, **JSON**, or **Text Outline** formats.
 
 <p align="center">
   <img src="assets/milestone_celebration.png?v=2" alt="DevPurge Milestone Dialog" width="460" />
@@ -98,11 +114,27 @@ DevPurge includes a standalone CLI tool for power users:
 # Safe Dry-Run (preview how much space can be reclaimed across multiple paths)
 DevPurge.Cli --path C:\repos,D:\repos
 
+# 🌳 TreeSize Disk Analyzer (hierarchical tree breakdown with proportional visual bars)
+DevPurge.Cli --path C:\repos --treesize
+
+# Limit TreeSize display depth (e.g., up to 2 or 3 directory levels deep)
+DevPurge.Cli --path C:\repos --treesize --depth 3
+
+# Export TreeSize analysis to a formatted text outline or JSON
+DevPurge.Cli --path C:\repos --treesize --depth 4 --export treesize-report.txt
+DevPurge.Cli --path C:\repos --treesize --export treesize-report.json
+
 # Purge folders untouched for more than 14 days
 DevPurge.Cli --path C:\repos --clean --min-age 14
 
 # Reclaim only heavy caches larger than 500MB
 DevPurge.Cli --path C:\repos --clean --min-size 500MB
+
+# Sort discovered folders by age, size, name, path, or files
+DevPurge.Cli --path C:\repos --sort age
+
+# Interactive selection before purging
+DevPurge.Cli --path C:\repos --clean --interactive
 
 # Purge only top 10 largest build artifact directories
 DevPurge.Cli --path C:\repos --clean --top 10

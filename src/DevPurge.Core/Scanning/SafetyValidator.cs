@@ -82,8 +82,19 @@ public static class SafetyValidator
         "pipfile.lock",
         "tsconfig.json",
         "nuget.config",
+        "directory.packages.props",
+        ".env",
+        ".env.local",
+        ".env.production",
         "main.tf",
         "flake.nix"
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly FrozenSet<string> ReservedDeviceNames = new[]
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
@@ -286,6 +297,16 @@ public static class SafetyValidator
                 return (false, "Cannot delete cloud storage metadata directory.");
             }
 
+            // 4c. Developer credentials and security directories check
+            if (string.Equals(folderName, ".ssh", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(folderName, ".gnupg", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(folderName, ".aws", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(folderName, ".azure", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(folderName, ".kube", StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, "Cannot delete developer credentials or security directory.");
+            }
+
             // 5. Must match one of the allowed target folder names
             var allowedSet = allowedFolderNames is FrozenSet<string> fs
                 ? fs
@@ -462,6 +483,15 @@ public static class SafetyValidator
             return (false, "Cannot target cloud synchronization metadata folders.");
         }
 
+        if (string.Equals(trimmed, ".ssh", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, ".gnupg", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, ".aws", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, ".azure", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, ".kube", StringComparison.OrdinalIgnoreCase))
+        {
+            return (false, "Cannot target developer credentials or security directory.");
+        }
+
         if (SystemFolderBlacklist.Contains(trimmed) ||
             string.Equals(trimmed, "appdata", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(trimmed, "users", StringComparison.OrdinalIgnoreCase) ||
@@ -472,16 +502,9 @@ public static class SafetyValidator
         }
 
         // Check Windows device reserved names
-        string[] reservedNames = ["CON", "PRN", "AUX", "NUL",
-            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
-
-        foreach (var reserved in reservedNames)
+        if (ReservedDeviceNames.Contains(trimmed))
         {
-            if (string.Equals(trimmed, reserved, StringComparison.OrdinalIgnoreCase))
-            {
-                return (false, $"'{trimmed}' is a reserved OS device name.");
-            }
+            return (false, $"'{trimmed}' is a reserved OS device name.");
         }
 
         return (true, null);

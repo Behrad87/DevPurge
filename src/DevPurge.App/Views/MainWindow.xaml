@@ -177,6 +177,109 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Navigation Tab Switcher Styles -->
+        <Style x:Key="TabCleanerButton" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCleanerTab}" Value="True">
+                    <Setter Property="Background" Value="#38BDF8" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#38BDF8" />
+                    <Setter Property="FontWeight" Value="Bold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TabTreeSizeButton" TargetType="Button" BasedOn="{StaticResource PillTabButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsTreeSizeTab}" Value="True">
+                    <Setter Property="Background" Value="#38BDF8" />
+                    <Setter Property="Foreground" Value="#0B1120" />
+                    <Setter Property="BorderBrush" Value="#38BDF8" />
+                    <Setter Property="FontWeight" Value="Bold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- TreeSize TreeViewItem Container Style -->
+        <Style x:Key="FluentTreeViewItemStyle" TargetType="{x:Type TreeViewItem}">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVis}}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="Foreground" Value="#F8FAFC" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TreeViewItem}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                    BorderBrush="#1E293B" BorderThickness="0,0,0,1"
+                                    CornerRadius="6" Margin="0,1" Padding="{TemplateBinding Padding}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="22" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ToggleButton x:Name="Expander" Focusable="False"
+                                                  IsChecked="{Binding Path=IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                                                  ClickMode="Press" Width="18" Height="18"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <ToggleButton.Style>
+                                            <Style TargetType="ToggleButton">
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ToggleButton">
+                                                            <Border Background="Transparent" Width="18" Height="18">
+                                                                <Path x:Name="Arrow" Data="M 1 1 L 6 6 L 1 11 Z"
+                                                                      Fill="#64748B" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" Width="6" Height="8" />
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsChecked" Value="True">
+                                                                    <Setter TargetName="Arrow" Property="RenderTransform">
+                                                                        <Setter.Value>
+                                                                            <RotateTransform Angle="90" CenterX="3" CenterY="4" />
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                    <Setter TargetName="Arrow" Property="Fill" Value="#38BDF8" />
+                                                                </Trigger>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Arrow" Property="Fill" Value="#F8FAFC" />
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ToggleButton.Style>
+                                    </ToggleButton>
+                                    <ContentPresenter x:Name="PART_Header" Grid.Column="1"
+                                                      ContentSource="Header" HorizontalAlignment="Stretch" />
+                                </Grid>
+                            </Border>
+                            <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="18,0,0,0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="Expander" Property="Visibility" Value="Hidden" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#250EA5E9" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A334155" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Window.InputBindings>
@@ -301,15 +404,9 @@
             <Grid.RowDefinitions>
                 <!-- 0. Header & Workspace Command Bar -->
                 <RowDefinition Height="Auto" />
-                <!-- 1. Storage Analytics Ribbon & Proportional Bar -->
-                <RowDefinition Height="Auto" />
-                <!-- 2. Controls & Filtering Toolbar -->
-                <RowDefinition Height="Auto" />
-                <!-- 3. Main Data Content / States -->
+                <!-- 1. Active Workspace View (Cleaner or TreeSize) -->
                 <RowDefinition Height="*" />
-                <!-- 4. Pinned / Floating Purge Action Bar -->
-                <RowDefinition Height="Auto" />
-                <!-- 5. Status Footer -->
+                <!-- 2. Status Footer -->
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -329,7 +426,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Brand Title & Tag -->
+                        <!-- Brand Title, Tag & Mode Switcher -->
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                             <Border CornerRadius="8" Width="28" Height="28" Margin="0,0,8,0" ClipToBounds="True">
                                 <Image Source="pack://application:,,,/Assets/icon.png" Width="28" Height="28" RenderOptions.BitmapScalingMode="HighQuality" />
@@ -338,8 +435,28 @@
                             <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="v2.0 • Fluent" FontSize="10" FontWeight="SemiBold" Foreground="#38BDF8" />
                             </Border>
-                            <TextBlock Text="— Fast developer disk reclaimer for node_modules, bin/obj, target &amp; virtualenvs"
-                                       FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" Margin="10,0,0,0" />
+
+                            <!-- Primary Navigation Switcher: Cleaner vs TreeSize Analyzer -->
+                            <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Padding="2" Margin="14,0,0,0" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Style="{StaticResource TabCleanerButton}"
+                                            Command="{Binding SwitchTabCommand}" CommandParameter="cleaner"
+                                            ToolTip="Developer Build Artifact &amp; Cache Reclaimer">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Broom24" FontSize="12" Margin="0,0,5,0" />
+                                            <TextBlock Text="Cleaner" FontSize="11" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource TabTreeSizeButton}"
+                                            Command="{Binding SwitchTabCommand}" CommandParameter="treesize"
+                                            ToolTip="Hierarchical Directory TreeSize Disk Space Analyzer">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="FolderOpen24" FontSize="12" Margin="0,0,5,0" />
+                                            <TextBlock Text="TreeSize Analyzer" FontSize="11" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <!-- Quick Path Presets -->
@@ -356,8 +473,8 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- Bottom Subrow: Workspace Directory Input & Primary Scan Button -->
-                    <Grid Grid.Row="1">
+                    <!-- Bottom Subrow (Cleaner Mode): Workspace Directory Input & Primary Scan Button -->
+                    <Grid Grid.Row="1" Visibility="{Binding IsCleanerTab, Converter={StaticResource BoolToVis}}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -413,11 +530,74 @@
                             </StackPanel>
                         </ui:Button>
                     </Grid>
+
+                    <!-- Bottom Subrow (TreeSize Mode): Target Folder Input & TreeSize Scan Button -->
+                    <Grid Grid.Row="1" Visibility="{Binding IsTreeSizeTab, Converter={StaticResource BoolToVis}}" DataContext="{Binding TreeSize}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:TextBox Grid.Column="0" Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Select or enter directory or drive to analyze disk space (e.g. C:\, D:\repos)..."
+                                    VerticalContentAlignment="Center" Margin="0,0,8,0" Height="36" />
+
+                        <ui:Button Grid.Column="1" Click="OnTreeSizeHistoryButtonClicked"
+                                   Appearance="Secondary" Height="36" Margin="0,0,8,0" ToolTip="Recent paths history">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="History24" Margin="0,0,6,0" Foreground="#38BDF8" />
+                                <TextBlock Text="History" FontWeight="Medium" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <ui:Button Grid.Column="2" Command="{Binding BrowsePathCommand}"
+                                   Appearance="Secondary" Height="36" Margin="0,0,8,0" ToolTip="Browse folder or drive">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="FolderOpen24" Margin="0,0,6,0" />
+                                <TextBlock Text="Browse..." FontWeight="Medium" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <ui:Button Grid.Column="3" Command="{Binding ScanCommand}"
+                                   Appearance="Primary" Height="36" Padding="18,0">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="DataPie24" Margin="0,0,8,0" />
+                                <TextBlock Text="Analyze Disk Tree" FontWeight="SemiBold" FontSize="13" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <ui:Button Grid.Column="4" Command="{Binding CancelScanCommand}"
+                                   Appearance="Danger" Height="36" Margin="8,0,0,0" Padding="12,0"
+                                   Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Dismiss24" Margin="0,0,6,0" />
+                                <TextBlock Text="Cancel" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </ui:Button>
+                    </Grid>
                 </Grid>
             </Border>
 
+            <!-- ============================================== -->
+            <!-- TAB 1: DEVELOPER CLEANER WORKSPACE             -->
+            <!-- ============================================== -->
+            <Grid Grid.Row="1" Visibility="{Binding IsCleanerTab, Converter={StaticResource BoolToVis}}">
+                <Grid.RowDefinitions>
+                    <!-- 0. Storage Analytics Ribbon & Proportional Bar -->
+                    <RowDefinition Height="Auto" />
+                    <!-- 1. Controls & Filtering Toolbar -->
+                    <RowDefinition Height="Auto" />
+                    <!-- 2. Main Data Content / States -->
+                    <RowDefinition Height="*" />
+                    <!-- 3. Pinned / Floating Purge Action Bar -->
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
             <!-- 1. STORAGE ANALYTICS HUD & ECOSYSTEM DISTRIBUTION RIBBON -->
-            <Border Grid.Row="1" Background="#A60F172A" BorderBrush="#243044" BorderThickness="1"
+            <Border Grid.Row="0" Background="#A60F172A" BorderBrush="#243044" BorderThickness="1"
                     CornerRadius="12" Padding="14,10" Margin="0,0,0,10"
                     Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
                 <Grid>
@@ -573,7 +753,7 @@
             </Border>
 
             <!-- 2. CONTROLS & FILTERING TOOLBAR -->
-            <Border Grid.Row="2" Background="#A60F172A" BorderBrush="#243044" BorderThickness="1"
+            <Border Grid.Row="1" Background="#A60F172A" BorderBrush="#243044" BorderThickness="1"
                     CornerRadius="10" Padding="12,8" Margin="0,0,0,10"
                     Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
                 <Grid>
@@ -705,7 +885,7 @@
             </Border>
 
             <!-- 3. MAIN DATA CONTENT / STATES -->
-            <Grid Grid.Row="3">
+            <Grid Grid.Row="2">
                 <!-- Scanning Progress Bar -->
                 <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Top"
                              Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
@@ -1032,7 +1212,7 @@
             </Grid>
 
             <!-- 4. FLOATING PURGE ACTION DOCK -->
-            <Border Grid.Row="4" Background="#E60F172A" BorderBrush="#334155" BorderThickness="1"
+            <Border Grid.Row="3" Background="#E60F172A" BorderBrush="#334155" BorderThickness="1"
                     CornerRadius="14" Padding="16,10" Margin="0,10,0,0"
                     Effect="{StaticResource FloatingBarGlow}"
                     Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
@@ -1070,15 +1250,357 @@
                     </ui:Button>
                 </Grid>
             </Border>
+            </Grid>
 
-            <!-- 5. FOOTER STATUS BAR -->
-            <Grid Grid.Row="5" Margin="0,10,0,0">
+            <!-- ============================================== -->
+            <!-- TAB 2: TREESIZE DISK ANALYZER WORKSPACE       -->
+            <!-- ============================================== -->
+            <Grid Grid.Row="1" Visibility="{Binding IsTreeSizeTab, Converter={StaticResource BoolToVis}}" DataContext="{Binding TreeSize}">
+                <Grid.RowDefinitions>
+                    <!-- 0. Storage KPI Ribbon -->
+                    <RowDefinition Height="Auto" />
+                    <!-- 1. Tree Toolbar -->
+                    <RowDefinition Height="Auto" />
+                    <!-- 2. Hierarchical TreeView & States -->
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- 0. Storage Analytics Ribbon -->
+                <Border Grid.Row="0" Background="#A60F172A" BorderBrush="#243044" BorderThickness="1"
+                        CornerRadius="12" Padding="16,12" Margin="0,0,0,10"
+                        Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Card 1: TOTAL DISK USAGE -->
+                        <Grid Grid.Column="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#162E44" Width="36" Height="36" CornerRadius="10" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="HardDrive24" FontSize="18" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="TOTAL DISK USAGE" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
+                                <TextBlock Text="{Binding FormattedTotalSize}" FontSize="18" FontWeight="Bold" Foreground="#38BDF8" Margin="0,1,0,0" />
+                                <TextBlock Text="Allocated space" FontSize="11" Foreground="#94A3B8" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Column="1" Width="1" Background="#1E293B" Margin="12,4" />
+
+                        <!-- Card 2: DIRECTORIES -->
+                        <Grid Grid.Column="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#1E293B" Width="36" Height="36" CornerRadius="10" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="Folder24" FontSize="18" Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="DIRECTORIES" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
+                                <TextBlock Text="{Binding TotalFolders, StringFormat='{}{0:N0}'}" FontSize="18" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,1,0,0" />
+                                <TextBlock Text="Subfolders scanned" FontSize="11" Foreground="#94A3B8" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Column="3" Width="1" Background="#1E293B" Margin="12,4" />
+
+                        <!-- Card 3: FILES COUNT -->
+                        <Grid Grid.Column="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#260E3D" Width="36" Height="36" CornerRadius="10" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="Document24" FontSize="18" Foreground="#C084FC" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="FILES SCANNED" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
+                                <TextBlock Text="{Binding TotalFiles, StringFormat='{}{0:N0}'}" FontSize="18" FontWeight="Bold" Foreground="#C084FC" Margin="0,1,0,0" />
+                                <TextBlock Text="Individual files" FontSize="11" Foreground="#94A3B8" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Column="5" Width="1" Background="#1E293B" Margin="12,4" />
+
+                        <!-- Card 4: DISPOSABLE ARTIFACTS -->
+                        <Grid Grid.Column="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#064E3B" Width="36" Height="36" CornerRadius="10" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="Broom24" FontSize="18" Foreground="#34D399" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="RECLAIMABLE ARTIFACTS" FontSize="10" FontWeight="Bold" Foreground="#64748B" />
+                                <TextBlock Text="{Binding FormattedArtifactsSize}" FontSize="18" FontWeight="Bold" Foreground="#34D399" Margin="0,1,0,0" />
+                                <TextBlock Text="{Binding ArtifactsCount, StringFormat='{}{0} cache folders'}" FontSize="11" Foreground="#10B981" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- 1. Tree Toolbar -->
+                <Border Grid.Row="1" Background="#A60F172A" BorderBrush="#243044" BorderThickness="1"
+                        CornerRadius="10" Padding="12,8" Margin="0,0,0,10"
+                        Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <!-- Search Box -->
+                            <ColumnDefinition Width="260" />
+                            <!-- Spacer -->
+                            <ColumnDefinition Width="*" />
+                            <!-- Actions -->
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:TextBox Grid.Column="0" Text="{Binding SearchFilterText, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Filter folders by name..."
+                                    Height="32" VerticalContentAlignment="Center" />
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:Button Command="{Binding ExpandAllCommand}" Appearance="Transparent" Padding="8,4" Margin="0,0,4,0"
+                                       ToolTip="Expand all folder nodes in tree">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ChevronDown24" FontSize="13" Margin="0,0,4,0" />
+                                    <TextBlock Text="Expand All" FontSize="11" />
+                                </StackPanel>
+                            </ui:Button>
+
+                            <ui:Button Command="{Binding CollapseAllCommand}" Appearance="Transparent" Padding="8,4" Margin="0,0,4,0"
+                                       ToolTip="Collapse folders to root level">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ChevronUp24" FontSize="13" Margin="0,0,4,0" />
+                                    <TextBlock Text="Collapse All" FontSize="11" />
+                                </StackPanel>
+                            </ui:Button>
+
+                            <Border Width="1" Height="16" Background="#334155" Margin="6,0,6,0" VerticalAlignment="Center" />
+
+                            <ui:Button Command="{Binding ExportTreeCommand}" Appearance="Transparent" Padding="8,4"
+                                       ToolTip="Export TreeSize report to CSV, JSON, or Text outline">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="14" Margin="0,0,4,0" Foreground="#38BDF8" />
+                                    <TextBlock Text="Export Tree..." FontSize="11" Foreground="#38BDF8" />
+                                </StackPanel>
+                            </ui:Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 2. Hierarchical TreeView & States -->
+                <Grid Grid.Row="2">
+                    <!-- TreeSize TreeView Grid -->
+                    <Border Background="#A60F172A" BorderBrush="#243044" BorderThickness="1" CornerRadius="10" Padding="8"
+                            Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <!-- Header Columns row -->
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Columns Header Ribbon -->
+                            <Border Grid.Row="0" Background="#161F30" BorderBrush="#243044" BorderThickness="0,0,0,1" CornerRadius="6" Padding="26,6,12,6" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" MinWidth="180" />
+                                        <ColumnDefinition Width="80" />
+                                        <ColumnDefinition Width="55" />
+                                        <ColumnDefinition Width="85" />
+                                        <ColumnDefinition Width="80" />
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="80" />
+                                        <ColumnDefinition Width="85" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Folder Name" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                    <TextBlock Grid.Column="1" Text="% of Parent" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="Percent" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="3" Text="Size" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="4" Text="Files" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="5" Text="Folders" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="6" Text="Age" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Right" Margin="0,0,12,0" />
+                                    <TextBlock Grid.Column="7" Text="Actions" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Hierarchical TreeView -->
+                            <TreeView Grid.Row="1" ItemsSource="{Binding RootNodes}"
+                                      ItemContainerStyle="{StaticResource FluentTreeViewItemStyle}"
+                                      Background="Transparent" BorderThickness="0"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate DataType="{x:Type vm:TreeSizeItemViewModel}" ItemsSource="{Binding Children}">
+                                        <Border Background="Transparent" Padding="2,3" HorizontalAlignment="Stretch">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="📁 Open in File Explorer" Command="{Binding OpenInExplorerCommand}">
+                                                        <MenuItem.Icon>
+                                                            <ui:SymbolIcon Symbol="Folder24" Foreground="#38BDF8" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="📋 Copy Full Path" Command="{Binding CopyPathCommand}">
+                                                        <MenuItem.Icon>
+                                                            <ui:SymbolIcon Symbol="Copy24" Foreground="#94A3B8" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <Separator />
+                                                    <MenuItem Header="🗑️ Move to Recycle Bin" Command="{Binding RequestPurgeCommand}">
+                                                        <MenuItem.Icon>
+                                                            <ui:SymbolIcon Symbol="Delete24" Foreground="#EF4444" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                            <Grid HorizontalAlignment="Stretch">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="22" />
+                                                    <ColumnDefinition Width="*" MinWidth="180" />
+                                                    <ColumnDefinition Width="80" />
+                                                    <ColumnDefinition Width="55" />
+                                                    <ColumnDefinition Width="85" />
+                                                    <ColumnDefinition Width="80" />
+                                                    <ColumnDefinition Width="70" />
+                                                    <ColumnDefinition Width="80" />
+                                                    <ColumnDefinition Width="85" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Icon -->
+                                                <ui:SymbolIcon Grid.Column="0" Symbol="{Binding FolderIconSymbol}" FontSize="14" Foreground="{Binding FolderIconBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" />
+
+                                                <!-- Name and Artifact Badge -->
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="#F8FAFC" VerticalAlignment="Center" />
+                                                    <Border Visibility="{Binding IsArtifact, Converter={StaticResource BoolToVis}}"
+                                                            Background="#0D2E26" BorderBrush="#10B981" BorderThickness="1"
+                                                            CornerRadius="4" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding ArtifactCategory}" FontSize="10" FontWeight="Bold" Foreground="#34D399" />
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <!-- Proportional Bar -->
+                                                <Border Grid.Column="2" Background="#1E293B" Height="4" CornerRadius="2" Width="70" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Border Background="{Binding BarBrush}" Width="{Binding RelativeBarWidth}" Height="4" CornerRadius="2" HorizontalAlignment="Left" />
+                                                </Border>
+
+                                                <!-- Percent -->
+                                                <TextBlock Grid.Column="3" Text="{Binding FormattedPercent}" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                                                <!-- Formatted Size -->
+                                                <TextBlock Grid.Column="4" Text="{Binding FormattedSize}" FontSize="12" FontWeight="Bold" Foreground="#38BDF8" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                                                <!-- File Count -->
+                                                <TextBlock Grid.Column="5" Text="{Binding FileCount, StringFormat='{}{0:N0} files'}" FontSize="11" Foreground="#64748B" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                                                <!-- Folder Count -->
+                                                <TextBlock Grid.Column="6" Text="{Binding DirectoryCount, StringFormat='{}{0:N0} dirs'}" FontSize="11" Foreground="#64748B" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                                                <!-- Age -->
+                                                <TextBlock Grid.Column="7" Text="{Binding FormattedAge}" FontSize="11" Foreground="#64748B" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" />
+
+                                                <!-- Quick Actions -->
+                                                <StackPanel Grid.Column="8" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                    <ui:Button Command="{Binding OpenInExplorerCommand}" Appearance="Transparent" Padding="4,2" Margin="0,0,2,0" ToolTip="Open in File Explorer">
+                                                        <ui:SymbolIcon Symbol="Folder24" FontSize="13" Foreground="#94A3B8" />
+                                                    </ui:Button>
+                                                    <ui:Button Command="{Binding CopyPathCommand}" Appearance="Transparent" Padding="4,2" Margin="0,0,2,0" ToolTip="Copy path to clipboard">
+                                                        <ui:SymbolIcon Symbol="Copy24" FontSize="13" Foreground="#94A3B8" />
+                                                    </ui:Button>
+                                                    <ui:Button Command="{Binding RequestPurgeCommand}" Appearance="Transparent" Padding="4,2" ToolTip="Safely move this folder to Recycle Bin">
+                                                        <ui:SymbolIcon Symbol="Delete24" FontSize="13" Foreground="#EF4444" />
+                                                    </ui:Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </Grid>
+                    </Border>
+
+                    <!-- Empty State -->
+                    <Border Background="#CC0F172A" CornerRadius="12" Padding="32"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            BorderBrush="#243044" BorderThickness="1"
+                            Visibility="{Binding HasNoItemsAndNotScanning, Converter={StaticResource BoolToVis}}">
+                        <StackPanel MaxWidth="480" HorizontalAlignment="Center">
+                            <Border Background="#162E44" Width="64" Height="64" CornerRadius="32" HorizontalAlignment="Center" Margin="0,0,0,16">
+                                <ui:SymbolIcon Symbol="FolderOpen24" FontSize="32" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="TreeSize Directory Space Analyzer"
+                                       FontSize="18" FontWeight="Bold" Foreground="#F8FAFC" HorizontalAlignment="Center" />
+                            <TextBlock Text="Analyze complete hierarchical disk usage across any folder or drive. Visualize space consumption with proportional size bars and instantly pinpoint large subtrees or disposable build caches."
+                                       FontSize="12" Foreground="#94A3B8" TextAlignment="Center" TextWrapping="Wrap" LineHeight="18" Margin="0,8,0,20" />
+
+                            <!-- Quick Start Buttons -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="D:\repos"
+                                           Appearance="Secondary" Margin="0,0,8,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Folder24" Margin="0,0,6,0" />
+                                        <TextBlock Text="Analyze D:\repos" />
+                                    </StackPanel>
+                                </ui:Button>
+                                <ui:Button Command="{Binding SelectQuickPathCommand}" CommandParameter="C:\repos"
+                                           Appearance="Secondary" Margin="0,0,8,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Folder24" Margin="0,0,6,0" />
+                                        <TextBlock Text="Analyze C:\repos" />
+                                    </StackPanel>
+                                </ui:Button>
+                                <ui:Button Command="{Binding BrowsePathCommand}" Appearance="Transparent">
+                                    <TextBlock Text="Choose Folder..." />
+                                </ui:Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Scanning Overlay State -->
+                    <Border Background="#E60F172A" CornerRadius="12" Padding="32"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            BorderBrush="#38BDF8" BorderThickness="1"
+                            Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
+                        <StackPanel MaxWidth="440" HorizontalAlignment="Center">
+                            <ui:ProgressRing IsIndeterminate="True" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center" />
+                            <TextBlock Text="Analyzing Directory Tree..." FontSize="16" FontWeight="Bold" Foreground="#F8FAFC" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding CurrentScanningPath}" FontSize="11" Foreground="#38BDF8" HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" Margin="0,6,0,12" MaxWidth="380" />
+                            <ui:Button Command="{Binding CancelScanCommand}" Appearance="Secondary" HorizontalAlignment="Center" Padding="14,4">
+                                <TextBlock Text="Cancel Analysis" FontSize="11" />
+                            </ui:Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- 2. FOOTER STATUS BAR -->
+            <Grid Grid.Row="2" Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
+                <!-- Cleaner status text -->
                 <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+                           Visibility="{Binding IsCleanerTab, Converter={StaticResource BoolToVis}}"
+                           Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                <!-- TreeSize status text -->
+                <TextBlock Grid.Column="0" Text="{Binding TreeSize.StatusText}"
+                           Visibility="{Binding IsTreeSizeTab, Converter={StaticResource BoolToVis}}"
                            Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">

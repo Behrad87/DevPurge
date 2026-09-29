@@ -20,28 +20,28 @@ $publishDir = Join-Path $root "publish"
 # 2. Build Windows x64 GUI
 Write-Host "`n[1/5] Publishing Windows x64 GUI (Single-File)..." -ForegroundColor Yellow
 $guiOut = Join-Path $publishDir "win-x64-gui"
-dotnet publish "$root/src/DevPurge.App/DevPurge.App.csproj" -c Release -r win-x64 --self-contained true `
+dotnet publish "$root/src/DevPurge.App/DevPurge.App.csproj" -c Release -f net8.0-windows -r win-x64 --self-contained true `
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $guiOut
 if ($LASTEXITCODE -ne 0) { throw "GUI publish failed." }
 
 # 3. Build Windows x64 CLI
 Write-Host "`n[2/5] Publishing Windows x64 CLI (Single-File)..." -ForegroundColor Yellow
 $winCliOut = Join-Path $publishDir "win-x64-cli"
-dotnet publish "$root/src/DevPurge.Cli/DevPurge.Cli.csproj" -c Release -r win-x64 --self-contained true `
+dotnet publish "$root/src/DevPurge.Cli/DevPurge.Cli.csproj" -c Release -f net8.0 -r win-x64 --self-contained true `
     -p:PublishSingleFile=true -o $winCliOut
 if ($LASTEXITCODE -ne 0) { throw "Windows CLI publish failed." }
 
 # 4. Build Linux x64 CLI
 Write-Host "`n[3/5] Publishing Linux x64 CLI (Single-File)..." -ForegroundColor Yellow
 $linuxX64Out = Join-Path $publishDir "linux-x64-cli"
-dotnet publish "$root/src/DevPurge.Cli/DevPurge.Cli.csproj" -c Release -r linux-x64 --self-contained true `
+dotnet publish "$root/src/DevPurge.Cli/DevPurge.Cli.csproj" -c Release -f net8.0 -r linux-x64 --self-contained true `
     -p:PublishSingleFile=true -o $linuxX64Out
 if ($LASTEXITCODE -ne 0) { throw "Linux x64 CLI publish failed." }
 
 # 5. Build Linux arm64 CLI
 Write-Host "`n[4/5] Publishing Linux ARM64 CLI (Single-File)..." -ForegroundColor Yellow
 $linuxArmOut = Join-Path $publishDir "linux-arm64-cli"
-dotnet publish "$root/src/DevPurge.Cli/DevPurge.Cli.csproj" -c Release -r linux-arm64 --self-contained true `
+dotnet publish "$root/src/DevPurge.Cli/DevPurge.Cli.csproj" -c Release -f net8.0 -r linux-arm64 --self-contained true `
     -p:PublishSingleFile=true -o $linuxArmOut
 if ($LASTEXITCODE -ne 0) { throw "Linux ARM64 CLI publish failed." }
 

@@ -58,6 +58,10 @@ public class ModelAndConfigTests
         Assert.Contains(rules, r => r.FolderNames.Contains("cmake-build-relwithdebinfo"));
         Assert.Contains(rules, r => r.FolderNames.Contains("cmake-build-minsizerel"));
         Assert.Contains(rules, r => r.FolderNames.Contains(".build"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".bundle"));
+        Assert.Contains(rules, r => r.FolderNames.Contains("dist-newstyle"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".stack-work"));
+        Assert.Contains(rules, r => r.FolderNames.Contains(".terraform"));
     }
 
     [Fact]
@@ -181,5 +185,41 @@ public class ModelAndConfigTests
 
         var unknownRules = PurgeRule.GetRulesByCategory("NonExistentCategory");
         Assert.Empty(unknownRules);
+    }
+
+    [Theory]
+    [InlineData(".bundle", ArtifactType.RubyBundle)]
+    [InlineData("dist-newstyle", ArtifactType.HaskellBuild)]
+    [InlineData(".stack-work", ArtifactType.HaskellBuild)]
+    [InlineData(".terraform", ArtifactType.TerraformCache)]
+    public void TryMatchFolder_FindsModernEcosystemRules(string folderName, ArtifactType expectedType)
+    {
+        Assert.True(PurgeRule.TryMatchFolder(folderName, out var rule));
+        Assert.NotNull(rule);
+        Assert.Equal(expectedType, rule.ArtifactType);
+    }
+
+    [Fact]
+    public void CoreServices_ImplementExpectedInterfaces()
+    {
+        DevPurge.Core.Scanning.IFastDirectoryScanner scanner = new DevPurge.Core.Scanning.FastDirectoryScanner();
+        Assert.NotNull(scanner);
+
+        DevPurge.Core.Purging.IPurgeService purgeService = new DevPurge.Core.Purging.PurgeService();
+        Assert.NotNull(purgeService);
+
+        DevPurge.Core.Auditing.IAuditLogger auditLogger = new DevPurge.Core.Auditing.AuditLogger();
+        Assert.NotNull(auditLogger);
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"settings_iface_{Guid.NewGuid():N}.json");
+        try
+        {
+            DevPurge.Core.Configuration.IUserSettingsManager settingsManager = new DevPurge.Core.Configuration.UserSettingsManager(tempPath);
+            Assert.NotNull(settingsManager);
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
     }
 }

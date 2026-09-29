@@ -16,6 +16,12 @@ public partial class MainWindow : FluentWindow
         InitializeComponent();
     }
 
+    public MainWindow(ViewModels.MainViewModel viewModel)
+    {
+        InitializeComponent();
+        DataContext = viewModel;
+    }
+
     private void OnHistoryButtonClicked(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement fe && DataContext is ViewModels.MainViewModel vm)
@@ -70,6 +76,36 @@ public partial class MainWindow : FluentWindow
         if (DataContext is ViewModels.MainViewModel vm)
         {
             vm.UpdateStorageBarWidth(e.NewSize.Width);
+        }
+    }
+
+    private void OnTreeSizeHistoryButtonClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && DataContext is ViewModels.MainViewModel vm)
+        {
+            var cm = new ContextMenu();
+            if (vm.TreeSize.RecentPaths.Count == 0)
+            {
+                var emptyItem = new MenuItem { Header = "No recent paths yet", IsEnabled = false };
+                cm.Items.Add(emptyItem);
+            }
+            else
+            {
+                foreach (var path in vm.TreeSize.RecentPaths)
+                {
+                    var item = new MenuItem
+                    {
+                        Header = $"📁  {path}",
+                        Command = vm.TreeSize.SelectQuickPathCommand,
+                        CommandParameter = path
+                    };
+                    cm.Items.Add(item);
+                }
+            }
+
+            cm.PlacementTarget = fe;
+            cm.Placement = PlacementMode.Bottom;
+            cm.IsOpen = true;
         }
     }
 }

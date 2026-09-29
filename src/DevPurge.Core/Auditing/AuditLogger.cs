@@ -6,15 +6,10 @@ namespace DevPurge.Core.Auditing;
 /// <summary>
 /// Thread-safe audit logger that records all purge, dry-run, and reclamation operations to persistent disk storage.
 /// </summary>
-public class AuditLogger
+public class AuditLogger(string? customLogPath = null) : IAuditLogger
 {
     private static readonly SemaphoreSlim FileLock = new(1, 1);
-    private readonly string _defaultLogPath;
-
-    public AuditLogger(string? customLogPath = null)
-    {
-        _defaultLogPath = customLogPath ?? GetDefaultLogPath();
-    }
+    private readonly string _defaultLogPath = customLogPath ?? GetDefaultLogPath();
 
     /// <summary>
     /// Gets the standard platform-specific log path for DevPurge audit records.
